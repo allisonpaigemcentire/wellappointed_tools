@@ -8,8 +8,8 @@ Shared developer tools. Clone the repository and use the project you need. Each 
 
 ## slopcheck
 
-[slopcheck](https://cursor.com/codebase/allisonpaigemcentire/slopcheck) is the owner's existing tool, kept in a private Origin repository (`https://origin.cursor.com/allisonpaigemcentire/slopcheck.git`, branch `main`). It is not in this tree. The environment that prepared the current branch could not authenticate to Origin, the codebase page requires a login, and there is no public GitHub copy. The tool was not rewritten. A later change can copy the source into `slopcheck/` once that repository is readable.
+[slopcheck](slopcheck/README.md) flags prose that reads like a model wrote it, and AI jargon a reader cannot check. It prints the line, the column, the matched words, and a plain-language fix. Run it on a file, a folder, or a pipe. Install notes, the jargon rules, and the pre-commit sample are in that directory.
 
 ## License
 
-There is no `LICENSE` file yet. The owner still needs to choose one. Nothing here should be treated as licensed for reuse until that file exists.
+MIT. See [LICENSE](LICENSE). The copyright holder is the same as in [slopcheck/LICENSE](slopcheck/LICENSE).

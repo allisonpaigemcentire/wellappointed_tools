@@ -107,4 +107,4 @@ pytest
 
 ## License
 
-This repository does not have a license yet. Ask the owner before you redistribute it.
+MIT. The license for this repository is [LICENSE](../LICENSE) at the repository root.

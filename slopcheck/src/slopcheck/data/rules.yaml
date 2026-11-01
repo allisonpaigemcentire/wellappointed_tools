@@ -1,0 +1,502 @@
+# Slop patterns shipped with slopcheck.
+# Each pattern is a Python regular expression, matched case-insensitively.
+# severity is error or warning. Errors fail a run when they exceed --max-errors
+# (default 0). Warnings are reported and do not fail the run unless you ask.
+# em_dash counts em dashes (and a spaced double hyphen) in the body.
+# More than max_per_window in any window of window_words is a finding.
+# Extend or override this file with --rules. Same id replaces the built-in.
+# Set replace: true in your file to ignore the built-ins.
+# A line can silence a hit: <!-- slopcheck-ok: pattern-id --> or a category name.
+# Quoted text, fenced code, and inline code are not scanned.
+
+version: 1
+em_dash:
+  enabled: true
+  severity: warning
+  max_per_window: 2
+  window_words: 300
+  suggestion: Use a period or a comma.
+patterns:
+- id: delve
+  category: ai-tell
+  severity: error
+  pattern: \bdelv(e|es|ed|ing)\b
+  suggestion: Use a plain verb such as look at, examine, or cover.
+- id: tapestry
+  category: ai-tell
+  severity: error
+  pattern: \btapestr(y|ies)\b
+  suggestion: Say what is connected, in plain words.
+- id: testament-to
+  category: ai-tell
+  severity: error
+  pattern: \btestament to\b
+  suggestion: State the fact. Cut the praise.
+- id: unlock-potential
+  category: ai-tell
+  severity: error
+  pattern: \bunlock(s|ed|ing)? the (power|potential)\b
+  suggestion: Say what becomes possible, with a number if you have one.
+- id: harness-potential
+  category: ai-tell
+  severity: error
+  pattern: \bharness(es|ed|ing)? the (power|potential)\b
+  suggestion: 'Use a plain verb: use, or apply.'
+- id: revolutionize
+  category: ai-tell
+  severity: error
+  pattern: \brevolutioni[sz](e|es|ed|ing)\b
+  suggestion: 'Name the change: what changed, for whom, and by how much.'
+- id: unleash
+  category: ai-tell
+  severity: error
+  pattern: \bunleash(es|ed|ing)?\b
+  suggestion: Use a concrete verb and say the outcome.
+- id: cutting-edge
+  category: ai-tell
+  severity: error
+  pattern: \bcutting[- ]edge\b
+  suggestion: Describe the property a reader can check.
+- id: best-in-class
+  category: ai-tell
+  severity: error
+  pattern: \bbest[- ]in[- ]class\b
+  suggestion: Say best at what, against which alternative, with a number.
+- id: transformative
+  category: ai-tell
+  severity: error
+  pattern: \btransformative\b|\btransformational\b
+  suggestion: Say what changed.
+- id: paradigm-shift
+  category: ai-tell
+  severity: error
+  pattern: \bparadigm[- ]shift(s|ing)?\b
+  suggestion: Say what changed, for whom.
+- id: paradigm-shifting
+  category: ai-tell
+  severity: error
+  pattern: \bparadigm[- ]shifting\b
+  suggestion: Say what changed, for whom.
+- id: embark-journey
+  category: ai-tell
+  severity: error
+  pattern: \bembark(s|ed|ing)? on (a|the|this|your) journey\b
+  suggestion: Use start, or name the first step.
+- id: lets-dive-in
+  category: ai-tell
+  severity: error
+  pattern: \blet['’]s dive in\b
+  suggestion: Start the section. The phrase adds nothing.
+- id: deep-dive
+  category: ai-tell
+  severity: error
+  pattern: \bdive deep\b|\bdeep[- ]dive\b
+  suggestion: Name the topic and start.
+- id: in-todays-world
+  category: ai-tell
+  severity: error
+  pattern: in today['’]?s? (rapidly[- ]evolving |ever[- ]changing |fast[- ]paced )?(world|landscape|era|age)
+  suggestion: Open with the concrete problem or a number.
+- id: in-todays-fast-paced
+  category: ai-tell
+  severity: error
+  pattern: in today['’]s fast[- ]paced
+  suggestion: Open with the concrete problem or a number.
+- id: gone-are-the-days
+  category: ai-tell
+  severity: error
+  pattern: \bgone are the days\b
+  suggestion: State what changed and when.
+- id: rhetorical-opener
+  category: ai-tell
+  severity: error
+  pattern: ^\s*(have you ever|ever wondered|what if i told you|are you ready to|imagine a world)\b
+  suggestion: Start with the claim or the story.
+- id: in-the-realm
+  category: ai-tell
+  severity: error
+  pattern: \bin the realm of\b
+  suggestion: Use in, or cut the phrase.
+- id: future-is-now
+  category: ai-tell
+  severity: error
+  pattern: \bthe future is now\b
+  suggestion: Describe what is working now.
+- id: future-of-work
+  category: ai-tell
+  severity: error
+  pattern: \bthe future of work\b
+  suggestion: Describe what is working now.
+- id: navigate-complexities
+  category: ai-tell
+  severity: error
+  pattern: \bnavigat(e|es|ing) the complexit(y|ies)\b|\bnavigat(e|es|ing) the (world|waters|maze)\b
+  suggestion: Name the specific hard part.
+- id: paves-the-way
+  category: ai-tell
+  severity: error
+  pattern: \bpav(e|es|ed|ing) the way\b
+  suggestion: End on the last concrete fact.
+- id: shaping-the-future
+  category: ai-tell
+  severity: error
+  pattern: \bshaping the future of\b
+  suggestion: End on the last concrete fact.
+- id: north-star
+  category: ai-tell
+  severity: error
+  pattern: \bnorth star\b
+  suggestion: Say the goal in literal words.
+- id: human-level
+  category: ai-tell
+  severity: error
+  pattern: \bhuman[- ]level\b|\boutperforms? humans\b|\blearns? like a (human|person|junior)\b
+  suggestion: Give the score, the test, and who ran it. Skip the human comparison.
+- id: new-electricity
+  category: ai-tell
+  severity: error
+  pattern: \bthe new electricity\b|\b(next |new |fourth )?industrial revolution\b|\bthe magic of (ai|llms?|the model)\b
+  suggestion: Cut the comparison, or give a dated, sourced figure.
+- id: mind-blowing
+  category: ai-tell
+  severity: error
+  pattern: \bmind[- ]blowing\b
+  suggestion: Give the result and its number.
+- id: leverage
+  category: ai-tell
+  severity: warning
+  pattern: \bleverag(e|es|ed|ing)\b
+  suggestion: 'Use a plain verb: use. As a noun, say the advantage you mean.'
+- id: seamless
+  category: ai-tell
+  severity: warning
+  pattern: \bseamless(ly)?\b
+  suggestion: Name the friction that was removed.
+- id: elevate
+  category: ai-tell
+  severity: warning
+  pattern: \belevat(e|es|ed|ing)\b
+  suggestion: Say what improves, and by how much.
+- id: robust
+  category: ai-tell
+  severity: warning
+  pattern: \brobust(ly)?\b
+  suggestion: Say what failure it survives.
+- id: streamline
+  category: ai-tell
+  severity: warning
+  pattern: \bstreamlin(e|es|ed|ing)\b
+  suggestion: Name the steps removed.
+- id: synergy
+  category: ai-tell
+  severity: warning
+  pattern: \bsynerg(y|ies|istic)\b
+  suggestion: Name the parts and how they connect.
+- id: holistic
+  category: ai-tell
+  severity: warning
+  pattern: \bholistic(ally)?\b
+  suggestion: Name the parts and how they connect.
+- id: pivotal
+  category: ai-tell
+  severity: warning
+  pattern: \bpivotal\b
+  suggestion: Say what it does.
+- id: crucial
+  category: ai-tell
+  severity: warning
+  pattern: \bcrucial(ly)?\b
+  suggestion: Say what it does, or cut the emphasis.
+- id: intricate
+  category: ai-tell
+  severity: warning
+  pattern: \bintricat(e|ely|acies)\b
+  suggestion: Say what is complicated, in concrete terms.
+- id: multifaceted
+  category: ai-tell
+  severity: warning
+  pattern: \bmultifaceted\b
+  suggestion: Say how many parts, and what they are.
+- id: realm
+  category: ai-tell
+  severity: warning
+  pattern: \brealms?\b
+  suggestion: Name the field or the system.
+- id: showcase
+  category: ai-tell
+  severity: warning
+  pattern: \bshowcas(e|es|ed|ing)\b
+  suggestion: Use show, or describe the example.
+- id: underscore
+  category: ai-tell
+  severity: warning
+  pattern: \bunderscor(e|es|ed|ing)\b
+  suggestion: End on the fact. Cut the verb that only adds emphasis.
+- id: foster
+  category: ai-tell
+  severity: warning
+  pattern: \bfoster(s|ed|ing)?\b
+  suggestion: Say what grows, and how.
+- id: meticulous
+  category: ai-tell
+  severity: warning
+  pattern: \bmeticulous(ly)?\b
+  suggestion: Say what was checked.
+- id: noteworthy
+  category: ai-tell
+  severity: warning
+  pattern: \bnoteworthy\b
+  suggestion: Say why it matters, with a fact.
+- id: invaluable
+  category: ai-tell
+  severity: warning
+  pattern: \binvaluable\b
+  suggestion: Say what it is worth, or cut the praise.
+- id: additionally
+  category: ai-tell
+  severity: warning
+  pattern: \badditionally\b
+  suggestion: Use also, or start a new sentence.
+- id: notably
+  category: ai-tell
+  severity: warning
+  pattern: \bnotably\b
+  suggestion: Say the fact. Cut the signpost.
+- id: empower
+  category: ai-tell
+  severity: warning
+  pattern: \bempower(s|ed|ing|ment)?\b
+  suggestion: Say who can do what.
+- id: facilitate
+  category: ai-tell
+  severity: warning
+  pattern: \bfacilitat(e|es|ed|ing)\b
+  suggestion: 'Use a plain verb: help, run, or make.'
+- id: endeavor
+  category: ai-tell
+  severity: warning
+  pattern: \bendeavou?r(s|ed|ing)?\b
+  suggestion: Use try, or name the work.
+- id: bolster
+  category: ai-tell
+  severity: warning
+  pattern: \bbolster(s|ed|ing)?\b
+  suggestion: Say what gets stronger, and how.
+- id: harmonize
+  category: ai-tell
+  severity: warning
+  pattern: \bharmoni[sz](e|es|ed|ing)\b
+  suggestion: Say what is brought into agreement.
+- id: vibrant
+  category: ai-tell
+  severity: warning
+  pattern: \bvibrant\b
+  suggestion: Say what is active, with a fact.
+- id: camaraderie
+  category: ai-tell
+  severity: warning
+  pattern: \bcamaraderie\b
+  suggestion: Say how the people work together.
+- id: palpable
+  category: ai-tell
+  severity: warning
+  pattern: \bpalpable\b
+  suggestion: Describe what a person could point at.
+- id: amidst
+  category: ai-tell
+  severity: warning
+  pattern: \bamidst\b
+  suggestion: Use amid, or during.
+- id: unravel
+  category: ai-tell
+  severity: warning
+  pattern: \bunravel(s|ed|ing|led|ling)?\b
+  suggestion: Say what was found, or what came apart.
+- id: grapple
+  category: ai-tell
+  severity: warning
+  pattern: \bgrappl(e|es|ed|ing)\b
+  suggestion: Say what is hard, and what was tried.
+- id: commendable
+  category: ai-tell
+  severity: warning
+  pattern: \bcommendable\b
+  suggestion: Say what was done.
+- id: revolutionary
+  category: ai-tell
+  severity: warning
+  pattern: \brevolutionary\b
+  suggestion: Say what changed, for whom, and by how much.
+- id: groundbreaking
+  category: ai-tell
+  severity: warning
+  pattern: \bgroundbreaking\b|\bground[- ]breaking\b
+  suggestion: Say what is new, with a fact.
+- id: breakthrough
+  category: ai-tell
+  severity: warning
+  pattern: \bbreakthroughs?\b
+  suggestion: Say what was achieved, with a number and a source.
+- id: unprecedented
+  category: ai-tell
+  severity: warning
+  pattern: \bunprecedented\b
+  suggestion: Compare it to the previous mark.
+- id: world-class
+  category: ai-tell
+  severity: warning
+  pattern: \bworld[- ]class\b
+  suggestion: Say best at what, with a fact.
+- id: rapidly-evolving
+  category: ai-tell
+  severity: warning
+  pattern: \brapidly[- ]evolving\b
+  suggestion: Say what changed and when.
+- id: ever-changing
+  category: ai-tell
+  severity: warning
+  pattern: \bever[- ]changing\b|\bever[- ]evolving\b
+  suggestion: Say what changed and when.
+- id: the-landscape
+  category: ai-tell
+  severity: warning
+  pattern: \bthe (?:[\w-]+ ){0,3}landscape\b
+  suggestion: Name the market, the tools, or the teams.
+- id: will-soon
+  category: ai-tell
+  severity: warning
+  pattern: \bwill (soon|inevitably)\b
+  suggestion: Date the claim, or say what is true now.
+- id: poised-to
+  category: ai-tell
+  severity: warning
+  pattern: \bis poised to\b
+  suggestion: Date the claim, or say what is true now.
+- id: not-just-but
+  category: contrast-frame
+  severity: error
+  pattern: \bnot (just|only|merely|simply) .{1,80}, but\b
+  suggestion: State the point. Mention the other side only if it is a real misconception.
+- id: not-because-but
+  category: contrast-frame
+  severity: error
+  pattern: \bnot because .{1,80}, but because\b
+  suggestion: State the real reason.
+- id: isnt-its
+  category: contrast-frame
+  severity: error
+  pattern: \b(?:is|are|was|were)n['’]t (?:just |only )?(?:about )?[^.,;]{1,60}, (?:it(?:['’]s| is)|they(?:['’]re| are))\b
+  suggestion: State the claim directly.
+- id: not-about-its-about
+  category: contrast-frame
+  severity: error
+  pattern: \b(?:it['’]s|it is) not about [^.;]{1,60}, (?:it['’]s|it is) about\b
+  suggestion: State what it is about.
+- id: reveal-question
+  category: reveal-fragment
+  severity: error
+  pattern: \bthe (result|answer|catch|kicker|twist)\?
+  suggestion: Put the finding in the sentence that carries it.
+- id: heres-the-thing
+  category: reveal-fragment
+  severity: error
+  pattern: \bhere['’]s the (thing|kicker|catch)\b
+  suggestion: Say the point. Cut the drumroll.
+- id: bottom-line
+  category: summary-closer
+  severity: error
+  pattern: \bthe bottom line\b
+  suggestion: Stop on the last useful fact.
+- id: ultimately
+  category: summary-closer
+  severity: error
+  pattern: \bultimately\b
+  suggestion: Stop on the last useful fact.
+- id: in-conclusion
+  category: summary-closer
+  severity: error
+  pattern: \bin conclusion\b
+  suggestion: Stop on the last useful fact.
+- id: in-summary
+  category: summary-closer
+  severity: error
+  pattern: \bin summary\b
+  suggestion: Stop on the last useful fact.
+- id: important-to-note
+  category: filler-hedge
+  severity: error
+  pattern: \bit['’]s important to note\b|\bit is important to note\b
+  suggestion: Delete it and state the fact.
+- id: worth-noting
+  category: filler-hedge
+  severity: error
+  pattern: \bit['’]s worth noting\b|\bit is worth noting\b
+  suggestion: Delete it and state the fact.
+- id: needless-to-say
+  category: filler-hedge
+  severity: error
+  pattern: \bneedless to say\b
+  suggestion: Delete it.
+- id: could-be-argued
+  category: filler-hedge
+  severity: error
+  pattern: \bit could be argued\b
+  suggestion: Own the opinion, or cut it.
+- id: crucial-to-note
+  category: filler-hedge
+  severity: error
+  pattern: \b(crucial|vital) to (note|remember|understand)\b
+  suggestion: Delete it and state the fact.
+- id: plays-a-role
+  category: filler-hedge
+  severity: error
+  pattern: \bplays a (crucial|vital|key|pivotal|important) role\b
+  suggestion: Say what it does.
+- id: end-of-the-day
+  category: filler-hedge
+  severity: error
+  pattern: \bat the end of the day\b
+  suggestion: End on the last concrete fact.
+- id: when-it-comes-to
+  category: filler-hedge
+  severity: error
+  pattern: \bwhen it comes to\b
+  suggestion: Make that thing the subject of the sentence.
+- id: moreover
+  category: filler-hedge
+  severity: warning
+  pattern: \bmoreover\b
+  suggestion: Use also, or start a new sentence.
+- id: furthermore
+  category: filler-hedge
+  severity: warning
+  pattern: \bfurthermore\b
+  suggestion: Use also, or start a new sentence.
+- id: in-order-to
+  category: filler-hedge
+  severity: warning
+  pattern: \bin order to\b
+  suggestion: Use to.
+- id: going-forward
+  category: filler-hedge
+  severity: warning
+  pattern: \b(going|moving) forward\b
+  suggestion: Say from now on, or cut it.
+- id: utilize
+  category: filler-hedge
+  severity: warning
+  pattern: \butili[sz](e|es|ed|ing|ation)\b
+  suggestion: Use use.
+- id: studies-show
+  category: filler-hedge
+  severity: warning
+  pattern: \bstudies (show|suggest|have shown)\b|\b(experts|analysts|observers) (say|agree|believe)\b|\bmany (leaders|experts|people)
+    believe\b
+  suggestion: Name the person or the study, with the sample and the date.
+- id: significance-tail
+  category: significance-tail
+  severity: warning
+  pattern: ',\s+(highlighting|underscoring|ensuring|showcasing|emphasi[sz]ing|reflecting|illustrating|demonstrating|signal(l)?ing|cementing|solidifying|paving|contributing
+    to|fostering|reinforcing|marking|making it|leaving|allowing|enabling|resulting in|creating|revealing|suggesting|indicating|positioning|setting
+    the stage)\b'
+  suggestion: End the sentence on the fact. Cut the trailing clause, or make it its own sentence.
