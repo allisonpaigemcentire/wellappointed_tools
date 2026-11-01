@@ -1,0 +1,14 @@
+# Install first, from the slopcheck/ directory of
+# https://github.com/allisonpaigemcentire/wellappointed_tools :
+#   pip install -e .
+# pre-commit installs a remote hook repo from its root. This package's
+# pyproject.toml is in slopcheck/, so a remote entry for the whole repository
+# will not install the console script. A local hook uses the installed command.
+repos:
+  - repo: local
+    hooks:
+      - id: slopcheck
+        name: slopcheck
+        entry: slopcheck
+        language: system
+        types_or: [markdown, text, rst]

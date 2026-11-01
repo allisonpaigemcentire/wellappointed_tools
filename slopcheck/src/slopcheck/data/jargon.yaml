@@ -1,0 +1,687 @@
+# Jargon dictionary shipped with slopcheck.
+# Four buckets: keep (never flagged), define (warn on a first use with no
+# definition beside it), replace and cut (flagged on every use).
+# false_friend: the everyday meaning misleads, so the first use needs a definition.
+# A false friend cannot be keep.
+# aliases are matched case-insensitively. Hyphens and spaces are interchangeable,
+# and a trailing plural s or es is allowed.
+# regex entries are Python patterns. (?-i:...) keeps an acronym case-sensitive.
+# Write entries without an em dash.
+# Replace or extend this file with --jargon, or merge a project file.
+# See the README for the decision rule and the first-use heuristic.
+
+entries:
+- term: AI enablement
+  bucket: keep
+  plain: helping teams adopt AI tools
+  false_friend: false
+  aliases:
+  - AI enablement
+  - enablement program
+  meaning: 'the work of helping teams adopt AI tools well: setting up repos and guardrails, training,
+    support, and measuring whether it helps. An "enablement program" is an organized effort to do that.'
+  note: Readers who do this work already know the term. For a general reader, say what the work is once.
+- term: AI-assisted
+  bucket: keep
+  plain: made with an AI tool's help
+  false_friend: false
+  aliases:
+  - AI-assisted
+  - AI-assisted change
+  - AI-assisted work
+  meaning: work (a code change, a PR, a draft) produced with help from an AI tool, whether the person
+    or the agent did most of it.
+  note: Say which tool, or how much help, when it matters.
+- term: benchmark
+  bucket: keep
+  plain: a standard test set
+  false_friend: false
+  aliases:
+  - benchmark
+  meaning: a fixed set of test tasks used to compare AI models or tools under the same conditions.
+  note: When it matters, say the results came from benchmark tasks, not a team's real codebase.
+- term: Copilot (product name)
+  bucket: keep
+  plain: the vendor's product, named with the vendor (GitHub Copilot, Microsoft Copilot)
+  false_friend: false
+  regex:
+  - (?-i:\bCopilot\b)
+  meaning: As a capitalized name, a product family from GitHub and Microsoft. The lowercase generic noun
+    is a separate replace entry.
+  note: Always name the vendor on first use.
+- term: non-functional requirements
+  bucket: keep
+  plain: requirements like performance and security
+  false_friend: false
+  aliases:
+  - non-functional requirements
+  meaning: requirements about how software must behave rather than what it does, such as performance,
+    security, accessibility, or reliability.
+  note: Engineering managers know it; add "such as performance or security" if the sentence needs it.
+- term: prompt
+  bucket: keep
+  plain: the instructions and input you give a model
+  false_friend: false
+  aliases:
+  - prompt
+  - prompting
+  meaning: The instructions and input you give a model, and the act of writing them.
+  note: When a sentence means everything the model sees (standing instructions, files, history, tool results),
+    say that, or use context engineering or system prompt.
+- term: agent
+  bucket: define
+  plain: an AI tool that takes steps on its own (reads files, runs commands, checks results, picks the
+    next step) until the task is done
+  false_friend: true
+  aliases:
+  - agent
+  - AI agent
+  - coding agent
+  meaning: An AI tool that does more than suggest text. It takes actions, such as reading files, editing
+    code, and running commands, in a loop, and the model itself chooses the next action until it decides
+    the task is done. Compare workflow, where the calling code fixes the steps in advance.
+  note: 'Prefer "coding agent" over the bare "agent" for software work. False friend: in everyday English
+    an agent acts for you under your instructions (a travel agent), which undersells how much the tool
+    decides for itself.'
+- term: agent skills
+  bucket: define
+  plain: reusable task recipes the agent can load
+  false_friend: false
+  aliases:
+  - agent skills
+  - agent skill
+  meaning: packaged, reusable instructions or workflows an AI agent can load for a recurring task (for
+    example, "generate API tests"). In ordinary prose, "skills" usually means people's skills.
+  note: Always write "agent skills" for the AI sense. The bare word "skills" usually means people's skills
+    and is not matched.
+- term: agent washing
+  bucket: define
+  plain: relabeling an ordinary chatbot, script, or automation as an "agent" to sell it
+  false_friend: false
+  aliases:
+  - agent washing
+  - agentwashing
+  note: Gartner's term (June 2025). Attribute it, and say what the product actually does on its own.
+- term: AGENTS.md / CLAUDE.md (context file)
+  bucket: define
+  plain: the instruction file for AI tools in the repo
+  false_friend: false
+  aliases:
+  - AGENTS.md
+  - CLAUDE.md
+  - context file
+  - repository-level context file
+  meaning: A plain-text file kept in a code repository for AI coding tools to read, covering things like
+    which test runner to use and which paths not to touch. AGENTS.md is the cross-tool name; CLAUDE.md
+    is the Claude Code equivalent.
+  note: Write the file names in code format (`AGENTS.md`). After the first gloss, instruction file is
+    enough.
+- term: AI champions
+  bucket: define
+  plain: engineers given time to help their teams adopt AI tools
+  false_friend: false
+  aliases:
+  - AI champion
+  - champions program
+  meaning: Engineers given dedicated time to help their teams adopt AI tools, for example by preparing
+    repos, answering questions, and sharing working examples.
+  note: Capitalize only when it is a company's program name.
+- term: AI engineering
+  bucket: define
+  plain: building software on top of AI models
+  false_friend: false
+  aliases:
+  - AI engineering
+  meaning: building software products on top of AI models (prompts, retrieval, evaluations, agent tooling),
+    as opposed to training the models. Used as a field or beat name.
+  note: Quote it as-is when it is part of someone's self-description.
+- term: chain-of-thought
+  bucket: define
+  plain: the intermediate steps a model writes out before its final answer
+  false_friend: false
+  aliases:
+  - chain-of-thought
+  - chain of thought
+  regex:
+  - (?-i:\bCoT\b)
+  note: Don't present the written steps as a faithful record of how the model reached its answer; they
+    can differ.
+- term: computer use
+  bucket: define
+  plain: 'an AI tool operating a screen the way a person does: reading screenshots, moving the pointer,
+    clicking, typing'
+  false_friend: true
+  aliases:
+  - computer use
+  - computer-use agent
+  - computer-using agent
+  note: 'False friend: in ordinary English "computer use" just means using a computer ("a computer use
+    policy").'
+- term: context engineering
+  bucket: define
+  plain: choosing what files, facts, and instructions the AI sees for a task
+  false_friend: false
+  aliases:
+  - context engineering
+  meaning: deliberately choosing and arranging the information an AI model sees for a task (instructions,
+    files, examples, tool results), rather than only polishing the wording of a single prompt.
+- term: context window
+  bucket: define
+  plain: how much text the model can consider at once
+  false_friend: false
+  aliases:
+  - context window
+  meaning: The most text (counted in tokens) a model can take in at once, covering instructions, files,
+    conversation, and its own output.
+- term: delivery throughput / instability (DORA)
+  bucket: define
+  plain: how fast and how often changes ship, and how often shipped changes fail or need rework
+  false_friend: false
+  aliases:
+  - delivery throughput
+  - delivery instability
+  - delivery stability
+  meaning: 'DORA''s two groups of software delivery measures. Throughput is how many changes move through
+    to production over a period: change lead time, deployment frequency, and failed deployment recovery
+    time. Instability is how well deployments go: change fail rate and deployment rework rate. DORA''s
+    current guide uses "instability", not "stability", and files recovery time under throughput.'
+  note: Attribute the measures to DORA and use DORA's current terms ("throughput", "instability").
+- term: distillation
+  bucket: define
+  plain: training a smaller, cheaper model to copy the answers of a bigger one
+  false_friend: true
+  aliases:
+  - distillation
+  - model distillation
+  - knowledge distillation
+  - distilled model
+  note: 'False friend: in ordinary English a distillation is a summary ("a distillation of the research").'
+- term: drift detection
+  bucket: define
+  plain: a check that flags when instructions or behavior go stale
+  false_friend: false
+  aliases:
+  - drift detection
+  meaning: monitoring that notices when something slowly moves away from its expected state. In machine
+    learning it means a model's inputs or outputs shifting over time. In agent setups it usually means
+    instruction files, configs, or agent behavior falling out of step with the code and the team's norms.
+  note: Say which kind of drift is meant.
+- term: embeddings
+  bucket: define
+  plain: coordinates where similar meanings land near each other
+  false_friend: false
+  aliases:
+  - embeddings
+  - embedding model
+  - vector embedding
+  meaning: Lists of numbers that place a piece of text at a point in space, so texts with similar meanings
+    sit close together and software can measure how close. Used in search, retrieval, and some scoring
+    methods. Not the same as "embedding AI into a team", which is ordinary English, so only the plural
+    noun and the model names are matched.
+- term: evals
+  bucket: define
+  plain: a fixed set of test cases rerun after every change and scored
+  false_friend: false
+  aliases:
+  - eval
+  - evals
+  meaning: 'A repeatable test of whether an AI system''s output is good enough for a task: the same example
+    inputs, each with an expected result or a scoring rule, run again after every change.'
+  note: 'Spell out "evaluation" the first time. An eval''s "target" (the repo or agent setup under test)
+    is eval jargon too: write "repo" when that is what it means.'
+- term: fail closed
+  bucket: define
+  plain: if the check breaks, the action is blocked
+  false_friend: false
+  aliases:
+  - fail closed
+  - fail-closed
+  - fails closed
+  meaning: when a safety check itself breaks or crashes, the risky action is blocked rather than allowed.
+    The opposite is *fail open*.
+- term: fine-tuning
+  bucket: define
+  plain: extra training on your own examples to change how a model behaves
+  false_friend: false
+  aliases:
+  - fine-tuning
+  - finetuning
+  - fine-tuned
+  - fine-tune
+  meaning: further training an existing model on your own examples so its built-in behavior changes. It
+    costs more and is slower than changing prompts or context.
+- term: hallucination
+  bucket: define
+  plain: a confident answer that is false
+  false_friend: true
+  regex:
+  - \bhallucinat(?:e|es|ed|ing|ion|ions)\b
+  meaning: when a model states something false or made up (a function, a fact, a citation) with full confidence.
+  note: 'Where possible, say what actually went wrong ("it cited a function that doesn''t exist"). False
+    friend: it suggests the model perceives things; it only produces text that happens to be wrong.'
+- term: harness / scaffold
+  bucket: define
+  plain: the agent software around the model
+  false_friend: true
+  aliases:
+  - harness
+  - scaffold
+  - scaffolding
+  - agent scaffolding
+  meaning: 'The software wrapped around a model that turns it into an agent: the loop, the tools, and
+    the prompts that a vendor, an open-source project, or a benchmark supplies. It is not the team''s
+    repo, tests, or checks.'
+  note: 'Always say whose harness it is (a vendor''s, an open-source framework, a benchmark''s). False
+    friend: a test harness in ordinary engineering is something else.'
+- term: hook
+  bucket: define
+  plain: a check script that runs before the tool acts
+  false_friend: false
+  aliases:
+  - pre-tool hook
+  - post-tool hook
+  - hook script
+  regex:
+  - \b(?:pre-?commit|session|stop|agent|tool|git)[- ]hooks?\b
+  meaning: A small script an AI tool runs automatically at a set moment, for example just before it executes
+    a command. It is how many blocking checks are enforced.
+  note: The bare word "hook" is not matched, because a story hook or hook question is ordinary English
+    here.
+- term: init command
+  bucket: define
+  plain: the tool's auto-generate command for a context file
+  false_friend: false
+  aliases:
+  - init command
+  regex:
+  - (?<![\w/])/init\b
+  meaning: a built-in command in some AI coding tools that automatically writes a context file (such as
+    AGENTS.md or CLAUDE.md) for a repo.
+- term: LLM
+  bucket: define
+  plain: the kind of AI model behind chat assistants and coding agents
+  false_friend: false
+  aliases:
+  - large language model
+  regex:
+  - (?-i:\bLLMs?\b)
+  meaning: A model trained on large amounts of text to predict and generate language and code; the engine
+    inside chat assistants and coding agents.
+  note: Spell it out once. After that, "model" usually reads better.
+- term: LLM-as-judge
+  bucket: define
+  plain: one model grading another model's output against a written rubric
+  false_friend: false
+  aliases:
+  - LLM-as-judge
+  - LLM-as-a-judge
+  - LLM judge
+  - model-graded
+- term: MCP
+  bucket: define
+  plain: a standard way to connect AI assistants to other apps and data
+  false_friend: false
+  aliases:
+  - Model Context Protocol
+  regex:
+  - (?-i:\bMCP\b)
+  meaning: An open standard that lets AI tools connect to other systems (issue trackers, databases, internal
+    docs) through "MCP servers", so the AI can read from or act on them.
+  note: Spell it out once.
+- term: memory
+  bucket: define
+  plain: notes an AI tool saves from earlier sessions and loads into later ones
+  false_friend: true
+  regex:
+  - \b(?:agent|model|AI|chatbot|assistant|long[- ]term|persistent|cross[- ]session)\s+memory\b
+  - \bmemory (?:feature|file|store|tool)s?\b
+  note: 'False friend from the guide''s list: the model does not remember anything between sessions; the
+    tool stores notes and feeds them back in. Ordinary uses ("institutional memory") are not matched.'
+- term: multi-agent
+  bucket: define
+  plain: a lead model splits the task, hands each part to a separate model run with its own instructions
+    and tools, then combines the results
+  false_friend: false
+  aliases:
+  - multi-agent
+  - multiagent
+  - multi-agent system
+  meaning: A setup where one model run breaks a task into parts and passes each part to another model
+    run, each with its own instructions, tools, and context, and the results are collected and merged.
+- term: open-weight
+  bucket: define
+  plain: a model you can download and run on your own hardware; not necessarily open source
+  false_friend: false
+  aliases:
+  - open-weight
+  - open weights
+  - open-weights
+  note: The license and training data may still be closed, so don't call it open source unless it is.
+- term: orchestration
+  bucket: define
+  plain: the code that decides which model, agent, or tool runs next and passes results between them
+  false_friend: false
+  aliases:
+  - orchestration
+  - orchestrator
+  - agent orchestration
+  note: Vendors use it loosely; name what is being coordinated. The verb "orchestrate" in its everyday
+    management sense is not matched.
+- term: 'permission rules: deny / ask / allow'
+  bucket: define
+  plain: block / ask first / allow
+  false_friend: false
+  aliases:
+  - deny list
+  - deny rule
+  - ask rule
+  - allow rule
+  - permission rules
+  meaning: Settings in an AI coding tool that block an action (deny), require a person's OK first (ask),
+    or let it run (allow).
+- term: prompt engineering
+  bucket: define
+  plain: writing better instructions for the model
+  false_friend: false
+  aliases:
+  - prompt engineering
+  - prompt engineer
+  meaning: the craft of wording instructions and examples to get better results from a model. It is increasingly
+    folded into the broader *context engineering*.
+  note: Leave it unchanged in proper names and talk titles.
+- term: prompt injection
+  bucket: define
+  plain: instructions hidden in a web page, email, or file that an AI tool reads and then follows as if
+    they came from you
+  false_friend: false
+  aliases:
+  - prompt injection
+  - prompt-injection attack
+  - indirect prompt injection
+- term: RAG
+  bucket: define
+  plain: the AI looks up relevant documents first, then answers from them
+  false_friend: false
+  aliases:
+  - retrieval-augmented generation
+  regex:
+  - (?-i:\bRAG\b)
+  meaning: a pattern where the system first looks up relevant documents or code and hands them to the
+    model, so the answer is grounded in that material instead of only what the model memorized.
+  note: Spell it out once, or skip the acronym.
+- term: reasoning model
+  bucket: define
+  plain: 'a model that works through intermediate steps before answering: slower and pricier, better on
+    hard multi-step problems'
+  false_friend: true
+  aliases:
+  - reasoning model
+  - thinking model
+  note: 'False friend: "reasoning" suggests human thought; it means the model writes out extra intermediate
+    steps, which costs time and tokens.'
+- term: repo readiness
+  bucket: define
+  plain: getting a repo ready for AI tools
+  false_friend: false
+  aliases:
+  - repo readiness
+  - AI-ready repo
+  meaning: 'how well a code repository is set up for AI coding tools to work in it: clear build and test
+    commands, a short instructions file, working tests, and documented conventions.'
+- term: retrieval
+  bucket: define
+  plain: finding the right files and facts to put in front of the model
+  false_friend: false
+  aliases:
+  - retrieval
+  - context retrieval
+  meaning: an agent or system finding the right files, documents, or facts to put in front of the model.
+- term: sandbox
+  bucket: define
+  plain: an isolated test environment the agent can't damage real systems from
+  false_friend: false
+  aliases:
+  - sandbox
+  meaning: an isolated environment (a container, a VM, or a restricted workspace) where an AI agent can
+    run without being able to damage real systems or data.
+  note: It keeps the agent away from real systems. It is not a substitute for a check that stops an action.
+- term: subagent
+  bucket: define
+  plain: a helper run a main agent starts for one piece of the task, with its own instructions, that reports
+    back a summary
+  false_friend: false
+  aliases:
+  - subagent
+  - sub-agent
+- term: SWE-bench
+  bucket: define
+  plain: a public test set of real bug-fix tasks
+  false_friend: false
+  aliases:
+  - SWE-bench
+  - SWE-bench Lite
+  - SWE-bench Verified
+  meaning: a widely used public benchmark built from real GitHub issues in open-source Python projects.
+    The test is whether an agent's fix makes the project's tests pass. "Lite" is a 300-task subset.
+- term: synthetic data
+  bucket: define
+  plain: examples generated by a model or a script instead of collected from real people or records
+  false_friend: false
+  aliases:
+  - synthetic data
+- term: system prompt
+  bucket: define
+  plain: standing instructions the tool's maker or admin puts in front of every conversation, before your
+    own request
+  false_friend: false
+  aliases:
+  - system prompt
+  - system message
+- term: temperature
+  bucket: define
+  plain: 'a setting for how much randomness the model uses when it picks each next word: low repeats,
+    high varies'
+  false_friend: true
+  aliases:
+  - temperature
+  note: 'False friend from the guide''s list: nothing to do with heat or mood.'
+- term: time horizon
+  bucket: define
+  plain: the length of task a model can reliably finish
+  false_friend: true
+  aliases:
+  - time horizon
+  meaning: 'METR''s measure of AI capability: how long a task (timed by how long it takes a skilled person)
+    a model can complete with a given reliability.'
+  note: 'Attribute it to METR. False friend: in business English a time horizon is a planning period.'
+- term: tokens
+  bucket: define
+  plain: the word pieces models read and bill by
+  false_friend: true
+  aliases:
+  - token
+  - tokens
+  meaning: The chunks of text (pieces of words) a model reads and writes. Usage limits, context size,
+    and cost are all counted in them.
+  note: 'False friend from the guide''s list: not access tokens, coins, or tokens of appreciation.'
+- term: tool call
+  bucket: define
+  plain: an action the agent takes, such as running a command or editing a file
+  false_friend: false
+  aliases:
+  - tool call
+  - tool calling
+  - tool use
+  meaning: a single action an AI agent takes through one of its tools, such as running a shell command,
+    editing a file, or querying a system. "Tool use" is the general ability.
+- term: uv / pip
+  bucket: define
+  plain: Python package installers
+  false_friend: false
+  regex:
+  - (?-i:\buv\b)
+  - (?-i:\bpip\b)
+  meaning: command-line tools that install Python packages. pip is the long-standing default; uv is a
+    newer, faster replacement.
+  note: A nearby sentence can do the defining ("Use uv, not pip, to install packages"). A bare uv with
+    no hint that it is a tool does not.
+- term: vibe coding
+  bucket: define
+  plain: building software with AI without reading the code it writes
+  false_friend: false
+  aliases:
+  - vibe coding
+  - vibe-coded
+  - vibe code
+  note: Narrow sense only. AI-assisted programming where a person reviews the code is not vibe coding.
+- term: workflow (vs. agent)
+  bucket: define
+  plain: a fixed sequence of model calls and tool steps that the calling code lays out in advance; the
+    model does each step but does not choose the next one
+  false_friend: true
+  aliases:
+  - AI workflow
+  - LLM workflow
+  regex:
+  - \b(?:model|agent)[- ](?:driven |based |powered )?workflows?\b
+  - \bworkflows? (?:vs\.?|versus|or) (?:an? )?agents?\b
+  meaning: 'From Anthropic''s "Building effective agents": a workflow runs models and tools through code
+    paths written in advance, while an agent lets the model steer its own process and decide which tool
+    to use next.'
+  note: 'False friend: in everyday English any process is a workflow. Only the AI senses above are matched.
+    If the steps are fixed in code, call it a workflow, whatever the product label says.'
+- term: agentic
+  bucket: replace
+  plain: say what it does
+  false_friend: false
+  aliases:
+  - agentic
+  meaning: An adjective vendors attach to tools or workflows where the AI acts on its own, and often to
+    anything with AI in it.
+  note: Name the steps it takes on its own ("runs the tests and fixes failures without asking"). Quote
+    it only inside attributed quotations or titles.
+- term: autonomous
+  bucket: replace
+  plain: say what it does without approval, and for how long
+  false_friend: false
+  regex:
+  - \b(?:fully |semi-)?autonomous(?:ly)?\b(?!\s+(?:teams?|squads?|groups?|units?|employees|people|staff|workers|managers?|developers?|engineers?|decisions?)\b)
+  note: Autonomous teams and people are ordinary management English and are not matched.
+- term: copilot (generic noun)
+  bucket: replace
+  plain: AI assistant, or AI coding assistant
+  false_friend: false
+  regex:
+  - (?-i:\bcopilots?\b)
+  note: Lowercase only; the capitalized product name is a keep entry.
+- term: few-shot / in-context learning
+  bucket: replace
+  plain: giving the model a few worked examples in the instructions
+  false_friend: false
+  aliases:
+  - few-shot
+  - zero-shot
+  - many-shot
+  - in-context learning
+  regex:
+  - (?-i:\bICL\b)
+  meaning: Improving a model's answer by putting a few worked examples or relevant material into the prompt,
+    with no retraining.
+- term: grounding
+  bucket: replace
+  plain: say which sources the answer must come from and cite
+  false_friend: true
+  aliases:
+  - grounding
+  note: 'False friend from the guide''s list: it sounds like a safety guarantee. Write the actual rule,
+    e.g. "answers only from the attached policy and links each claim to it".'
+- term: guardrails
+  bucket: replace
+  plain: name the actual check, e.g. "a filter that blocks X"
+  false_friend: false
+  aliases:
+  - guardrail
+  - guard rail
+  meaning: A control that limits what an AI tool may do. The word covers everything from a written policy
+    to a check that stops a command, which is why the guide moves it to replace.
+  note: 'Say which kind: a check that runs before a tool call and can stop it, or guidance that only advises.'
+- term: human-in-the-loop
+  bucket: replace
+  plain: '"a person approves X before Y happens"'
+  false_friend: false
+  aliases:
+  - human-in-the-loop
+  - human-on-the-loop
+  regex:
+  - (?-i:\bHITL\b)
+- term: inference
+  bucket: replace
+  plain: running the model
+  false_friend: false
+  regex:
+  - (?<!causal )(?<!statistical )\binference\b
+  meaning: Running a trained model to get an answer. "Inference cost" is the bill for those runs.
+  note: For cost, write "running cost" or "cost per task". Quote it only inside attributed quotations.
+- term: Pass@1
+  bucket: replace
+  plain: share of tasks solved on the first try
+  false_friend: false
+  aliases:
+  - pass@k
+  regex:
+  - \bpass@\d+\b
+  meaning: 'a benchmark score: the share of tasks a model solves correctly on its first attempt.'
+  note: If the number is used, give the plain version.
+- term: slop
+  bucket: replace
+  plain: low-quality AI output
+  false_friend: false
+  aliases:
+  - slop
+  - AI slop
+  meaning: low-quality, generic, or careless AI-generated output.
+  note: In reader-facing prose, say what was wrong with the output.
+- term: 10x / game-changer / supercharge
+  bucket: cut
+  plain: give the measured number, or delete
+  false_friend: false
+  regex:
+  - \b10x\b
+  - \bgame[- ]chang(?:er|ers|ing)\b
+  - \bsupercharg(?:e|es|ed|ing)\b
+- term: AGI
+  bucket: cut
+  plain: use only when attributing someone's claim, never as a description
+  false_friend: false
+  aliases:
+  - artificial general intelligence
+  regex:
+  - (?-i:\bAGI\b)
+  note: Inside an attributed quote it is exempt.
+- term: AI-enabled
+  bucket: cut
+  plain: delete it, or say how the team uses AI ("teams working with AI")
+  false_friend: false
+  aliases:
+  - AI-enabled
+  meaning: A loose label for a team or product that uses AI in some way. It doesn't say how, or how well.
+  note: Like AI-native, it names no practice a reader can check.
+- term: AI-native / AI-first
+  bucket: cut
+  plain: usually no claim underneath; delete it, or say what is actually different
+  false_friend: false
+  aliases:
+  - AI-native
+  - AI-first
+  meaning: A vague label for people, tools, or processes built around AI from the start.
+  note: 'Example of what to say instead: "new developers who have always used AI tools".'
+- term: frontier model
+  bucket: cut
+  plain: name the model and its version
+  false_friend: false
+  aliases:
+  - frontier model
+  - frontier AI
+  - frontier lab
+  meaning: the newest and most capable models from the leading AI labs at a given moment.
+  note: '"The newest models" goes stale; a model name and date does not.'

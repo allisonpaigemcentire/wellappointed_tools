@@ -1,0 +1,10 @@
+# pre-commit reads this file from a git root. In
+# https://github.com/allisonpaigemcentire/wellappointed_tools the package
+# lives in slopcheck/, so use the local hook in examples/pre-commit-config.yaml
+# after `pip install -e .` from this directory.
+- id: slopcheck
+  name: slopcheck
+  description: Flag AI-writing patterns and AI jargon that needs plainer wording
+  entry: slopcheck
+  language: python
+  types_or: [markdown, text, rst]
