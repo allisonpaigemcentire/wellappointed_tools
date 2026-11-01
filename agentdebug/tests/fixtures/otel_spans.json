@@ -1,0 +1,36 @@
+[
+  {
+    "name": "chat demo-model",
+    "traceId": "aaa",
+    "spanId": "001",
+    "attributes": {
+      "gen_ai.operation.name": "chat",
+      "gen_ai.agent.name": "researcher",
+      "gen_ai.request.model": "demo-model",
+      "gen_ai.usage.input_tokens": 15,
+      "gen_ai.usage.output_tokens": 6,
+      "gen_ai.tool.name": "lookup"
+    },
+    "status": {"code": "OK"}
+  },
+  {
+    "name": "execute_tool lookup",
+    "traceId": "aaa",
+    "spanId": "002",
+    "attributes": [
+      {"key": "gen_ai.operation.name", "value": {"stringValue": "execute_tool"}},
+      {"key": "gen_ai.agent.name", "value": {"stringValue": "researcher"}},
+      {"key": "gen_ai.tool.name", "value": {"stringValue": "lookup"}},
+      {"key": "error.type", "value": {"stringValue": "timeout"}},
+      {"key": "gen_ai.usage.input_tokens", "value": {"intValue": "3"}},
+      {"key": "gen_ai.usage.output_tokens", "value": {"intValue": 0}}
+    ],
+    "events": [
+      {
+        "name": "gen_ai.tool.call",
+        "attributes": {"gen_ai.tool.name": "lookup"}
+      }
+    ],
+    "status": {"code": "ERROR", "message": "deadline exceeded"}
+  }
+]
