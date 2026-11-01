@@ -1,0 +1,190 @@
+"""Opt-out notes, link glosses, editor notes, and unpublished sections."""
+
+import json
+from pathlib import Path
+
+from slopcheck.check import check_text
+from slopcheck.cli import main
+from slopcheck.load import load_jargon, load_rules
+from slopcheck.text import ScanConfig, compile_editor_notes, compile_skip_headings
+
+RULES = load_rules()
+JARGON = load_jargon()
+FIXTURE = Path(__file__).parent / "fixtures" / "draft-notes.md"
+
+
+def hits(text: str, scan: ScanConfig | None = None):
+    return check_text(text if text.endswith("\n") else text + "\n", "t.md", RULES, JARGON, scan=scan)
+
+
+def jargon(text: str, scan: ScanConfig | None = None):
+    return [item for item in hits(text, scan) if item.category == "jargon"]
+
+
+def test_opt_out_note_in_parentheses_is_not_part_of_the_id():
+    text = (
+        "The vendor calls it agentic. "
+        "<!-- slop-ok: jargon (approved wording) -->"
+    )
+    assert jargon(text) == []
+
+
+def test_opt_out_note_after_a_dash_and_slopcheck_ok():
+    assert hits("Let's dive in. <!-- slopcheck-ok: lets-dive-in - kept on purpose -->") == []
+    found = hits("We should delve into the logs. <!-- slop-ok: ai-tell — section opener we want -->")
+    assert all(item.category != "ai-tell" for item in found)
+    assert jargon("The vendor calls it agentic. <!-- slopcheck-ok: jargon – approved wording -->") == []
+
+
+def test_a_note_does_not_silence_a_different_rule():
+    found = hits("We should delve into agentic tools. <!-- slop-ok: jargon (approved) -->")
+    assert any(item.rule_id == "delve" for item in found)
+    assert all(item.rule_id != "agentic" for item in found)
+
+
+def test_markdown_link_is_not_a_gloss_and_the_url_is_not_checked():
+    found = jargon("See [AI champions](https://example.com/champions) for the rollout.")
+    assert len(found) == 1
+    assert found[0].rule_id == "AI champions"
+    assert found[0].severity == "warning"
+    assert found[0].match.lower() == "ai champions"
+
+    image = jargon("![frontier model](https://example.com/pic.png)")
+    assert any(item.rule_id == "frontier model" and item.severity == "error" for item in image)
+
+    relative = jargon("See [AI champions](champions.md) today.")
+    assert any(item.rule_id == "AI champions" for item in relative)
+
+    assert jargon(
+        "AI champions (engineers given time to help their teams adopt AI tools) lead it."
+    ) == []
+    assert jargon(
+        "See [AI champions](https://example.com) (engineers given time to help their teams adopt AI tools)."
+    ) == []
+    assert all(item.category != "ai-tell" for item in hits("Read the [docs](https://example.com/delve-into-this)."))
+    assert any(item.rule_id == "lets-dive-in" for item in hits("Read [let's dive in](https://example.com/start) later."))
+
+
+def test_editor_notes_and_html_comments_are_not_checked():
+    assert jargon("The public line stays. [EDITOR: agentic is approved in this note]") == []
+    assert jargon("<!-- agentic belongs in this comment -->") == []
+    found = hits("We should delve here. [EDITOR: and also delve in the note]")
+    assert [item.rule_id for item in found if item.rule_id == "delve"] == ["delve"]
+    assert any(item.rule_id == "agentic" for item in jargon("[editor: agentic is not a capitalised note]"))
+    quiet = hits("[EDITOR: one — two — three — done and it is a game-changer]")
+    assert quiet == []
+
+
+def test_unpublished_headings_skip_until_the_same_or_higher_level():
+    text = """
+## Internal notes
+
+This agentic setup is a game-changer.
+
+### Nested note
+
+Ultimately the draft stays internal.
+
+## Published again
+
+We should delve into the logs.
+
+## Editor notes
+
+In today's rapidly evolving landscape, teams wait.
+
+## Not for publication
+
+Let's dive in.
+
+## Sources (not for publication)
+
+It's important to note that the cache was cold.
+
+## Internal-notes
+
+The bottom line is the draft.
+
+# After the notes
+
+The tests passed on Tuesday.
+"""
+    found = hits(text)
+    assert [(item.line, item.rule_id) for item in found] == [(12, "delve")]
+
+
+def test_slopcheck_off_and_on_markers():
+    text = """
+<!-- slopcheck-off -->
+
+The inference bill doubled.
+
+<!-- slopcheck-on -->
+
+We should delve into the logs.
+"""
+    found = hits(text)
+    assert [item.rule_id for item in found] == ["delve"]
+    assert hits("<!-- slopcheck-off -->\nWe should delve into the logs.\n") == []
+
+
+def test_markers_inside_a_fence_do_not_toggle():
+    text = "```\n<!-- slopcheck-off -->\n```\nWe should delve into the logs.\n"
+    assert any(item.rule_id == "delve" for item in hits(text))
+
+
+def test_config_replaces_skip_lists(tmp_path, monkeypatch, capsys):
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / ".slopcheck.yaml").write_text(
+        "skip_headings: []\neditor_notes: []\n",
+        encoding="utf-8",
+    )
+    path = tmp_path / "note.md"
+    path.write_text(
+        "## Internal notes\n\nThis agentic setup stays.\n\n[EDITOR: agentic too]\n",
+        encoding="utf-8",
+    )
+    assert main(["--json", "--fail-on", "none", str(path)]) == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert sum(1 for item in payload["findings"] if item["rule_id"] == "agentic") == 2
+
+    (tmp_path / ".slopcheck.yaml").write_text(
+        "skip_headings:\n  - Scratch\n",
+        encoding="utf-8",
+    )
+    path.write_text("## Scratch\n\nWe should delve into the logs.\n\n## Next\n\nLet's dive in.\n", encoding="utf-8")
+    assert main(["--json", "--fail-on", "none", str(path)]) == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert [item["rule_id"] for item in payload["findings"]] == ["lets-dive-in"]
+
+
+def test_bad_editor_note_pattern_exits_2(tmp_path, monkeypatch, capsys):
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / ".slopcheck.yaml").write_text("editor_notes:\n  - '['\n", encoding="utf-8")
+    path = tmp_path / "note.md"
+    path.write_text("Hello.\n", encoding="utf-8")
+    assert main([str(path)]) == 2
+    assert "editor_notes" in capsys.readouterr().err
+
+
+def test_compile_helpers_reject_bad_lists():
+    import pytest
+    from slopcheck.load import ConfigError
+    with pytest.raises(ConfigError):
+        compile_editor_notes("nope")
+    with pytest.raises(ConfigError):
+        compile_skip_headings(["", "ok"])
+
+
+def test_fixture_before_was_12_and_now_keeps_two_published_hits():
+    """The same file produced 12 findings before these skips.
+
+    Eleven were errors and one was a warning. The champions link was not
+    among them, because the URL's parenthesis looked like a gloss. After the
+    fix that link is flagged, and the opt-out, the editor note, the comment,
+    the off/on stretch, and the unpublished headings are not.
+    """
+    text = FIXTURE.read_text(encoding="utf-8")
+    found = check_text(text, "draft-notes.md", RULES, JARGON)
+    assert len(found) == 2
+    assert {(item.line, item.rule_id) for item in found} == {(5, "AI champions"), (21, "delve")}

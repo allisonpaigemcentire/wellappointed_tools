@@ -1,0 +1,9 @@
+# Manifest for this package. In wellappointed_tools it lives in slopcheck/,
+# not at the git root, so pre-commit will not load it from a repo: entry.
+# Consumer setup: examples/pre-commit-config.yaml
+- id: slopcheck
+  name: slopcheck
+  description: Flag AI-writing patterns and AI jargon that needs plainer wording
+  entry: slopcheck
+  language: python
+  types_or: [markdown, text, rst]

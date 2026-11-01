@@ -1,0 +1,18 @@
+name: prose
+
+on:
+  pull_request:
+
+jobs:
+  slopcheck:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      # Pin a commit or a tag instead of main when you want a fixed revision.
+      - name: Install slopcheck
+        run: pip install "slopcheck @ git+https://github.com/allisonpaigemcentire/wellappointed_tools.git@main#subdirectory=slopcheck"
+      - name: Check prose
+        run: slopcheck --fail-on error docs/

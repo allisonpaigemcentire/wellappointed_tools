@@ -1,0 +1,13 @@
+# pre-commit reads .pre-commit-hooks.yaml from the git root. This repo keeps
+# that file in slopcheck/, so install the console script with a local hook.
+# Replace main with a commit or a tag when you want a fixed revision.
+repos:
+  - repo: local
+    hooks:
+      - id: slopcheck
+        name: slopcheck
+        entry: slopcheck
+        language: python
+        types_or: [markdown, text, rst]
+        additional_dependencies:
+          - "slopcheck @ git+https://github.com/allisonpaigemcentire/wellappointed_tools.git@main#subdirectory=slopcheck"
