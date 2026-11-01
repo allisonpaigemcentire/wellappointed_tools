@@ -8,7 +8,7 @@ false friend, warns when its first use has no definition beside it.
 from slopcheck.check import check_paths, check_text
 from slopcheck.load import ConfigError, load_jargon, load_rules
 
-__version__ = "0.1.0"
+__version__ = "0.2.0"
 
 __all__ = [
     "ConfigError",

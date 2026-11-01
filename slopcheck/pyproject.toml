@@ -1,6 +1,6 @@
 [project]
 name = "slopcheck"
-version = "0.1.0"
+version = "0.2.0"
 description = "Flag AI-writing patterns and AI jargon, and suggest a plain-language fix."
 readme = "README.md"
 license = "MIT"
@@ -34,7 +34,7 @@ build-backend = "setuptools.build_meta"
 where = ["src"]
 
 [tool.setuptools.package-data]
-slopcheck = ["data/*.yaml", "py.typed"]
+slopcheck = ["data/*", "py.typed"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

@@ -27,6 +27,9 @@ class Pattern:
     pattern: str
     suggestion: str
     rx: re.Pattern
+    # True when the source pattern starts with ^. The ^ is enforced as a
+    # sentence start, not merely the start of a wrapped line.
+    sentence_start: bool = False
 
 
 @dataclass
@@ -166,13 +169,17 @@ def _pattern_from(raw: dict, where: str) -> Pattern:
             raise ConfigError(f"{where}: pattern {raw.get('id')!r} needs {key}")
     if raw["severity"] not in ("error", "warning"):
         raise ConfigError(f"{where}: pattern {raw['id']!r} severity must be error or warning")
+    source = str(raw["pattern"])
+    sentence_start = source.startswith("^")
+    compiled = source[1:] if sentence_start else source
     return Pattern(
         id=str(raw["id"]),
         category=str(raw["category"]),
         severity=str(raw["severity"]),
-        pattern=str(raw["pattern"]),
+        pattern=source,
         suggestion=str(raw["suggestion"]),
-        rx=compile_regex(str(raw["pattern"]), where=f"{where}: pattern {raw['id']}"),
+        rx=compile_regex(compiled, where=f"{where}: pattern {raw['id']}"),
+        sentence_start=sentence_start,
     )
 
 

@@ -36,6 +36,14 @@ Do not put an em dash in an entry. The loader rejects it.
 
 Add a case next to the category you touched. `pytest` runs the suite. A new pattern should have one line that flags and one line that should stay quiet.
 
+Prose checks live next to the pattern checks: repeated phrases, near-duplicates, briefs, rhythm, and edit damage. A new check needs a line that flags and a line that should stay quiet. Keep a check off by default when it still misfires. The missing-function-word check is the current example.
+
+`slopcheck bench` is the measurement on the public-domain excerpts and the synthetic labeled files. A unit test can lock the README to that output. Do not describe the unit test as the benchmark. The labeled files overstate recall. Do not add a private draft, a private name, or a secret to `bench/`.
+
+## Names
+
+Do not treat a capital at the start of a sentence as a name. Confirm it with a mid-sentence capital, or add it under `known_names`. The shipped list in `data/names.txt` is public-domain literary names from the bench excerpts.
+
 ## Tone of the docs
 
 Plain words. No hype. No em dashes. Quote a term when you are talking about the term.

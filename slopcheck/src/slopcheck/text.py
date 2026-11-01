@@ -406,6 +406,57 @@ def _is_table_rule(line: str) -> bool:
     return bool(re.match(r"^\s*\|?[\s:|-]+\|?\s*$", line)) and "-" in line
 
 
+def is_structural_line(text: str) -> bool:
+    """A heading, list marker, table row, or rule. Not a prose paragraph line."""
+    stripped = text.strip()
+    if not stripped:
+        return True
+    if HEADING_RE.match(text) or LIST_RE.match(text) or TABLE_RE.match(text) or HR_RE.match(stripped):
+        return True
+    return _is_table_rule(text)
+
+
+def prose_paragraphs(lines: list[LineInfo]) -> list[list[LineInfo]]:
+    """Body paragraphs. Headings, lists, tables, code, and skipped sections stay out."""
+    groups: list[list[LineInfo]] = []
+    current: list[LineInfo] = []
+    for line in lines:
+        if line.kind != "body" or is_structural_line(line.text):
+            if current:
+                groups.append(current)
+                current = []
+            continue
+        current.append(line)
+    if current:
+        groups.append(current)
+    return groups
+
+
+def prose_sentences(lines: list[LineInfo], scan: ScanConfig | None = None) -> list[Sentence]:
+    """Sentences from prose paragraphs only."""
+    sentences: list[Sentence] = []
+    for group in prose_paragraphs(lines):
+        parts = [(line.number, line.text) for line in group]
+        text, origins = _join(parts)
+        for start, end in split_sentences(text):
+            _append_sentence(sentences, text, origins, start, end, scan)
+    return sentences
+
+
+def line_suppressed(lines: list[LineInfo], number: int, *, rule_id: str, category: str) -> bool:
+    for line in lines:
+        if line.number == number and suppressed(line.keys, rule_id=rule_id, category=category, bucket=None):
+            return True
+    return False
+
+
+def any_line_suppressed(lines: list[LineInfo], numbers: set[int], *, rule_id: str, category: str) -> bool:
+    for number in numbers:
+        if line_suppressed(lines, number, rule_id=rule_id, category=category):
+            return True
+    return False
+
+
 def front_sentences(lines: list[LineInfo], scan: ScanConfig | None = None) -> list[Sentence]:
     sentences: list[Sentence] = []
     for line in lines:
