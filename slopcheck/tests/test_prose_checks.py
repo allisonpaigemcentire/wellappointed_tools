@@ -231,3 +231,15 @@ def test_diff_command_matches_baseline(tmp_path, capsys):
 def test_exclude_category_still_drops_a_new_check():
     text = "The the door stuck in the frame.\n"
     assert hits(text, "edit-damage", exclude={"edit-damage"}) == []
+
+
+def test_em_dash_window_count_matches_on_a_long_document():
+    from slopcheck.check import check_text
+    from slopcheck.load import load_rules
+
+    rules = load_rules()
+    filler = "word " * 400
+    text = filler + "one — two — three — four — five.\n"
+    found = [item for item in check_text(text, "t.md", rules, None) if item.rule_id == "em-dash"]
+    assert len(found) == 1
+    assert found[0].suggestion.startswith(f"4 em dashes in {rules.em_dash.window_words} words")

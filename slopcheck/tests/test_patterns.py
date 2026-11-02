@@ -167,3 +167,105 @@ def test_builtin_categories_exist():
         "filler-hedge",
         "significance-tail",
     }
+
+
+@pytest.mark.parametrize("line", [
+    "It's not just about speed — it's about the failing test.",
+    "It's not just about speed, it's about the failing test.",
+    "It is not about speed; it is about the failing test.",
+    "The release isn't merely a patch; it's a new model.",
+    "The workflows aren't just scripts — they're a paradigm shift.",
+    "The migration wasn't simply a rename -- it's a rewrite.",
+    "We don't just ship code. We ship outcomes.",
+    "They don't merely test the agent — they audit it.",
+])
+def test_contrast_frame_flags_other_separators(line):
+    assert hits(line + "\n", "contrast-frame"), line
+
+
+@pytest.mark.parametrize("line", [
+    "It isn't fast; the cache is cold.",
+    "We don't just guess.",
+    "The release isn't ready. The tests are red.",
+    "It's not about the money.",
+])
+def test_contrast_frame_other_separators_plain(line):
+    assert hits(line + "\n", "contrast-frame") == [], line
+
+
+@pytest.mark.parametrize("line, rule", [
+    ("This will unlock new levels of speed.", "unlock-new-levels"),
+    ("The possibilities are endless.", "possibilities-endless"),
+    ("The best is yet to come.", "best-yet-to-come"),
+    ("The results speak for themselves.", "speak-for-themselves"),
+    ("We help teams stay ahead of the curve.", "ahead-of-the-curve"),
+    ("Our commitment to excellence is clear.", "commitment-to-excellence"),
+    ("Her care shines through in every chapter.", "shines-through"),
+    ("We embark on this exciting journey together.", "embark-journey"),
+])
+def test_ai_tell_phrases_the_review_found(line, rule):
+    assert any(item.rule_id == rule for item in hits(line + "\n", "ai-tell")), line
+
+
+@pytest.mark.parametrize("line", [
+    "We unlocked the door at noon.",
+    "The data covers three weeks.",
+    "The curve flattened after the fix.",
+    "Sun came in through the window.",
+])
+def test_new_ai_tell_phrases_stay_quiet(line):
+    assert hits(line + "\n", "ai-tell") == [], line
+
+
+def test_overlapping_rules_count_one_tell_once():
+    found = hits("In today's fast-paced world, teams wait.\n", "ai-tell")
+    assert [item.rule_id for item in found] == ["in-todays-world"]
+    assert found[0].match == "In today's fast-paced world"
+
+
+def test_the_shorter_rule_still_fires_alone():
+    found = hits("In today's fast-paced market, teams wait.\n", "ai-tell")
+    assert [item.rule_id for item in found] == ["in-todays-fast-paced"]
+
+
+def test_jargon_inside_a_pattern_is_not_counted_twice():
+    found = hits("We harness the power of tests.\n")
+    assert [(item.rule_id, item.category) for item in found] == [("harness-potential", "ai-tell")]
+
+
+def test_jargon_outside_a_pattern_is_still_reported():
+    found = hits("The harness the team runs is old.\n")
+    assert any(item.category == "jargon" for item in found)
+
+
+def test_different_categories_on_one_span_both_report():
+    from slopcheck.check import drop_nested_findings
+    from slopcheck.model import Finding
+
+    def make(rule, category, column, end):
+        return Finding("t.md", 1, column, 1, end, "error", category, rule, "x", "s")
+
+    outer = make("a", "ai-tell", 1, 20)
+    inner_same = make("b", "ai-tell", 3, 10)
+    inner_other = make("c", "filler", 3, 10)
+    kept = drop_nested_findings([outer, inner_same, inner_other], {"a", "b", "c"})
+    assert kept == [outer, inner_other]
+
+
+@pytest.mark.parametrize("line", [
+    "We don't just ship code, we ship outcomes.",
+    "It doesn't just run, it reports.",
+])
+def test_contrast_frame_flags_a_comma_join(line):
+    assert hits(line + "\n", "contrast-frame"), line
+
+
+@pytest.mark.parametrize("line", [
+    "It doesn't only fail on Windows. It also fails on macOS.",
+    "They don't only test it; they even fuzz it.",
+    "We don't just test, we also lint, we ship.",
+    "The cache isn't warm yet — it is still loading.",
+    "They aren't cheap, they're also slow.",
+])
+def test_not_only_also_adds_a_claim_and_is_not_a_contrast_frame(line):
+    assert hits(line + "\n", "contrast-frame") == [], line

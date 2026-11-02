@@ -23,6 +23,8 @@ HEADING_RE = re.compile(r"^#{1,6}\s")
 LIST_RE = re.compile(r"^\s*(?:[-*+]|\d+[.)])\s+")
 TABLE_RE = re.compile(r"^\s*\|")
 HR_RE = re.compile(r"^(?:-{3,}|\*{3,}|_{3,})\s*$")
+# A YAML mapping key at the start of a front-matter line: `slug: x` or `"key": x`.
+FRONT_KEY_RE = re.compile(r"""^(?:\w[\w .-]*|"[^"]*"|'[^']*')\s*:(?:\s|$)""")
 TITLE_RE = re.compile(
     r"^(\s*)(title|subtitle|excerpt|description|summary|preheader|subject)\s*:\s*(.*)$",
     re.I,
@@ -238,21 +240,110 @@ def title_span(line: str) -> tuple[str, int] | None:
     return value, column
 
 
+def _blank(line: str, start: int, end: int) -> str:
+    """Replace line[start:end] with spaces, keeping the column of everything after it."""
+    return line[:start] + " " * (end - start) + line[end:]
+
+
+def _closes_ahead(lines: list[str]) -> list[bool]:
+    """For each index i, whether `-->` comes in lines[i:] before a blank line or a code fence ends the paragraph.
+
+    Built once, back to front, so a page full of stray openers stays linear.
+    """
+    ahead = [False] * (len(lines) + 1)
+    for index in range(len(lines) - 1, -1, -1):
+        line = lines[index]
+        if not line.strip() or FENCE_RE.match(line):
+            # A fence ends the paragraph. A `-->` inside a code block cannot close the comment.
+            ahead[index] = False
+        elif "-->" in line:
+            ahead[index] = True
+        else:
+            ahead[index] = ahead[index + 1]
+    return ahead
+
+
+def mask_comment_lines(
+    line: str,
+    in_comment: bool,
+    closes_later: bool = False,
+) -> tuple[str, bool]:
+    """Blank the parts of `line` inside an HTML comment that spans lines.
+
+    Returns the line with those parts replaced by spaces of the same length,
+    and whether a comment is still open at the end of the line. A comment
+    that opens and closes on one line is left for `mask_text`.
+
+    `closes_later` says whether a `-->` comes on a later line of the same
+    paragraph. As in CommonMark, a `<!--` at the start of a line opens a comment block
+    that runs to `-->` or the end of the file. A `<!--` later in a line is a comment only when `-->` follows
+    before the paragraph ends. Otherwise it is literal text, so a stray
+    `<!--` in prose does not hide the rest of the page.
+    """
+    cursor = 0
+    if in_comment:
+        close = line.find("-->")
+        if close < 0:
+            return " " * len(line), True
+        line = _blank(line, 0, close + 3)
+        cursor = close + 3
+    code = [match.span() for match in CODE_RE.finditer(line)]
+    while True:
+        start = line.find("<!--", cursor)
+        if start < 0:
+            return line, False
+        if any(low <= start < high for low, high in code):
+            cursor = start + 4
+            continue
+        close = line.find("-->", start + 4)
+        if close >= 0:
+            cursor = close + 3
+            continue
+        lead = line[:start]
+        block = not lead.strip() and len(lead) <= 3
+        if block or closes_later:
+            return _blank(line, start, len(line)), True
+        cursor = start + 4
+
+
+def _looks_like_front_matter(body: list[str]) -> bool:
+    """True when every line between the `---` fences could be YAML.
+
+    A page that opens with a thematic break (`---`) and a paragraph is not
+    front matter, and its prose must still be checked.
+    """
+    for line in body:
+        stripped = line.strip()
+        if not stripped or stripped.startswith("#") or line[:1] in (" ", "\t"):
+            continue
+        if stripped.startswith("- ") or stripped == "-":
+            continue
+        if FRONT_KEY_RE.match(line):
+            continue
+        return False
+    return True
+
+
 def classify_lines(text: str, scan: ScanConfig | None = None) -> list[LineInfo]:
+    """Label each line as front, title, body, code, or skip. Lines inside a multi-line HTML comment are skipped or blanked."""
     scan = scan or default_scan_config()
     lines = normalize(text).split("\n")
     front_end = None
-    if lines and lines[0].strip() == "---":
+    # A byte order mark before the opening fence still starts front matter.
+    if lines and lines[0].lstrip("\ufeff").strip() == "---":
         for index in range(1, len(lines)):
             if lines[index].strip() == "---":
-                front_end = index
+                if _looks_like_front_matter(lines[1:index]):
+                    front_end = index
                 break
+    ahead = _closes_ahead(lines)
     info: list[LineInfo] = []
     in_fence = False
     fence_char = ""
     fence_len = 0
     skip_level: int | None = None
     marker_off = False
+    in_comment = False
     for index, line in enumerate(lines):
         number = index + 1
         keys = opt_keys(line)
@@ -264,6 +355,12 @@ def classify_lines(text: str, scan: ScanConfig | None = None) -> list[LineInfo]:
             else:
                 info.append(LineInfo(number, line, "front", keys=keys))
             continue
+        if in_comment or not in_fence:
+            was_open = in_comment
+            line, in_comment = mask_comment_lines(line, in_comment, ahead[index + 1])
+            if was_open and not line.strip():
+                info.append(LineInfo(number, line, "skip", keys=keys))
+                continue
         marker = FENCE_RE.match(line)
         if marker:
             token = marker.group(1)

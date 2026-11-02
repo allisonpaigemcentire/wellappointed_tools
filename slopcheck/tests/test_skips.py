@@ -188,3 +188,117 @@ def test_fixture_before_was_12_and_now_keeps_two_published_hits():
     found = check_text(text, "draft-notes.md", RULES, JARGON)
     assert len(found) == 2
     assert {(item.line, item.rule_id) for item in found} == {(5, "AI champions"), (21, "delve")}
+
+
+def test_front_matter_is_checked_through_title_fields_only():
+    text = (
+        "---\n"
+        "title: A plain title\n"
+        "slug: delve-into-the-game-changer\n"
+        "tags: [tapestry, paradigm-shift]\n"
+        "---\n"
+        "The tests passed.\n"
+    )
+    assert hits(text) == []
+    flagged = hits("---\ntitle: Let us delve into it\n---\nThe tests passed.\n")
+    assert [item.rule_id for item in flagged] == ["delve"]
+    assert flagged[0].line == 2
+
+
+def test_multi_line_html_comments_are_not_checked():
+    text = (
+        "<!-- Notes for the editor:\n"
+        "     delve into the tapestry, it's a game-changer\n"
+        "     and agentic too -->\n"
+        "The tests passed.\n"
+    )
+    assert hits(text) == []
+    assert jargon(text) == []
+
+
+def test_text_after_a_multi_line_comment_closes_is_checked():
+    text = "<!-- a note\nstill the note --> We should delve here.\n"
+    found = [item for item in hits(text) if item.rule_id == "delve"]
+    assert len(found) == 1
+    assert (found[0].line, found[0].column) == (2, 30)
+
+
+def test_text_before_an_open_comment_is_checked():
+    text = "We should delve here. <!-- delve\ninto this tapestry -->\n"
+    found = [item.rule_id for item in hits(text)]
+    assert found.count("delve") == 1
+    assert "tapestry" not in found
+
+
+def test_a_comment_opener_in_inline_code_does_not_hide_the_page():
+    text = "Write `<!--` to open a comment.\nWe should delve here.\n"
+    assert [item.rule_id for item in hits(text) if item.rule_id == "delve"] == ["delve"]
+
+
+def test_a_comment_opener_inside_a_fence_does_not_hide_the_page():
+    text = "```html\n<!--\n```\nWe should delve here.\n"
+    assert [item.rule_id for item in hits(text) if item.rule_id == "delve"] == ["delve"]
+
+
+def test_rule_ids_in_disable_are_matched_without_case():
+    from slopcheck.load import merge_rules
+
+    merged = merge_rules(load_rules(), "disable: [Delve]\n", "rules.yaml")
+    assert "delve" not in {pattern.id for pattern in merged.patterns}
+
+
+def test_a_stray_comment_opener_in_prose_does_not_hide_the_page():
+    for text in (
+        'Type "<!--" to start a comment.\n\nWe should delve here.\n',
+        "The arrow <!-- starts one.\n\nWe should delve here.\n",
+        "The arrow <!-- starts one.\nWe should delve here.\n",
+    ):
+        assert [item.rule_id for item in hits(text) if item.rule_id == "delve"] == ["delve"], text
+
+
+def test_a_comment_block_at_the_start_of_a_line_runs_to_the_end_when_unclosed():
+    assert hits("<!--\nWe should delve\n\nStill delve\n") == []
+
+
+def test_a_comment_inside_a_fence_does_not_open_and_text_after_is_checked():
+    text = "~~~\n<!-- open\n~~~\nWe should delve.\n-->\n"
+    assert [item.line for item in hits(text) if item.rule_id == "delve"] == [4]
+
+
+def test_multi_line_comment_with_crlf_line_endings():
+    text = "<!--\r\nWe should delve\r\n-->\r\nWe delve here.\r\n"
+    assert [item.line for item in hits(text) if item.rule_id == "delve"] == [4]
+
+
+def test_empty_and_blank_files_have_no_findings():
+    assert hits("") == []
+    assert hits("\n\n") == []
+    assert hits("---\n") == []
+
+
+def test_front_matter_after_a_byte_order_mark_is_still_front_matter():
+    text = "\ufeff---\nslug: delve\ntitle: Let us delve\n---\nBody is fine.\n"
+    assert [(item.line, item.rule_id) for item in hits(text)] == [(3, "delve")]
+
+
+def test_front_matter_must_be_at_the_top():
+    text = "Intro line.\n\n---\nslug: delve\n---\n"
+    assert [item.line for item in hits(text) if item.rule_id == "delve"] == [4]
+
+
+def test_a_page_that_opens_with_a_thematic_break_is_still_checked():
+    text = "---\n\nWe should delve into this.\n\n---\n\nMore text.\n"
+    assert [item.line for item in hits(text) if item.rule_id == "delve"] == [3]
+
+
+# Regression cases from the 2026-11-02 Debugging Bot review.
+
+
+def test_a_closer_inside_a_code_fence_does_not_close_a_mid_line_opener():
+    text = "Type <!-- to open a comment.\n```\n-->\n```\nWe should delve here.\n"
+    assert [item.rule_id for item in hits(text) if item.rule_id == "delve"] == ["delve"]
+
+
+def test_front_matter_key_may_start_with_a_non_ascii_letter():
+    text = "---\nñame: Notes\nslug: delve-into-the-tapestry\n---\nThe tests passed.\n"
+    assert hits(text) == []
