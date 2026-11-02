@@ -547,3 +547,26 @@ def test_tool_registry_decorator_and_camel_case_tool_names_are_tools(tmp_path: P
         "    sys.stdout.write(str(items))\n",
     )
     assert sorted(item.line for item in findings if item.rule_id == "AGT007") == [2, 5]
+
+
+def test_client_built_with_timeout_none_does_not_cover_its_calls(tmp_path: Path):
+    findings = _source(
+        tmp_path,
+        "import httpx\n"
+        "http = httpx.Client(timeout=None)\n"
+        "def fetch(url):\n"
+        "    return http.get(url)\n",
+    )
+    assert [(item.rule_id, item.line) for item in findings] == [("AGT006", 4)]
+
+
+def test_lower_camel_case_tool_name_is_a_tool(tmp_path: Path):
+    findings = _source(
+        tmp_path,
+        "def toolSendEmail(to):\n"
+        "    smtp.send(to)\n"
+        "\n"
+        "def toolbar_send(items):\n"
+        "    smtp.send(items)\n",
+    )
+    assert [item.line for item in findings if item.rule_id == "AGT007"] == [1]

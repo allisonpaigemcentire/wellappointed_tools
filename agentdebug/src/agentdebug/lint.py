@@ -77,8 +77,8 @@ _APPROVAL_NAME = re.compile(r"(?i)(approv|confirm|human_ok|require_approval|auth
 _WRITE_CALLS = {"write", "send", "post", "delete", "publish", "remove", "unlink", "rmtree", "put", "patch"}
 # "tool" as a whole name segment: tool_x, x_tool, x_tools_y. Not render_toolbar.
 _TOOL_NAME = re.compile(r"(?i)(^|_)tools?($|_)")
-# camelCase or PascalCase: sendEmailTool, ToolRunner, runToolsNow. Not renderToolbar.
-_TOOL_CAMEL = re.compile(r"(?:^|[a-z0-9])Tools?(?:$|[A-Z_])")
+# camelCase or PascalCase: sendEmailTool, ToolRunner, runToolsNow, toolSendEmail. Not renderToolbar or toolbar.
+_TOOL_CAMEL = re.compile(r"(?:^|[a-z0-9])Tools?(?:$|[A-Z_])|^tools?[A-Z]")
 
 
 @dataclass(frozen=True)
@@ -632,13 +632,21 @@ def _clients_with_timeout(tree: ast.AST) -> set[str]:
             targets, value = [node.target], node.value
         else:
             continue
-        if not isinstance(value, ast.Call) or not _has_keyword(value, "timeout"):
+        if not isinstance(value, ast.Call) or not _has_real_timeout(value):
             continue
         for target in targets:
             parts = _strip_self(_chain(target))
             if len(parts) == 1:
                 covered.add(parts[0])
     return covered
+
+
+def _has_real_timeout(node: ast.Call) -> bool:
+    """True when the call passes timeout= with a value other than None. timeout=None turns timeouts off."""
+    for keyword in node.keywords:
+        if keyword.arg == "timeout":
+            return not (isinstance(keyword.value, ast.Constant) and keyword.value.value is None)
+    return False
 
 
 def _strip_self(parts: list[str]) -> list[str]:
