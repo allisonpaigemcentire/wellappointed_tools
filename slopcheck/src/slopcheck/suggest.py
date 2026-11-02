@@ -41,7 +41,7 @@ def zipf_frequency(word: str) -> float:
         from wordfreq import zipf_frequency as freq
     except ImportError as exc:
         raise SuggestError(
-            'The term suggester needs wordfreq. Install it with: pip install "slopcheck[suggest]"'
+            'The term suggester needs wordfreq. Install it with: pip install "wordfreq>=3.1"'
         ) from exc
     return float(freq(word, "en"))
 

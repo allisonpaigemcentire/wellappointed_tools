@@ -1,6 +1,8 @@
 # Sample check for a repository that has this package at ./slopcheck,
 # as in https://github.com/allisonpaigemcentire/wellappointed_tools .
-# After a PyPI release, `pip install slopcheck` can replace `pip install ./slopcheck`.
+# Do not use `pip install slopcheck`. That PyPI name is a different project.
+# Outside this repository, install from git:
+#   pip install "slopcheck @ git+https://github.com/allisonpaigemcentire/wellappointed_tools#subdirectory=slopcheck"
 name: prose
 
 on:
