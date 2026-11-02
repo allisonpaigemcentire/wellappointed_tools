@@ -109,6 +109,7 @@ entries:
   aliases:
   - AGENTS.md
   - CLAUDE.md
+  - GEMINI.md
   - context file
   - repository-level context file
   meaning: A plain-text file kept in a code repository for AI coding tools to read, covering things like
@@ -265,9 +266,11 @@ entries:
   false_friend: true
   aliases:
   - harness
-  - scaffold
   - scaffolding
   - agent scaffolding
+  regex:
+  # The noun only. "scaffolds the report" and "to scaffold a project" use the verb.
+  - (?<!\bto )\bscaffold\b(?!s?\s+(?:the|a|an|this|that|these|those|your|our|their|its|my|new|out|up)\b)
   meaning: 'The software wrapped around a model that turns it into an agent: the loop, the tools, and
     the prompts that a vendor, an open-source project, or a benchmark supplies. It is not the team''s
     repo, tests, or checks.'
@@ -626,12 +629,30 @@ entries:
   bucket: replace
   plain: share of tasks solved on the first try
   false_friend: false
+  regex:
+  - \bpass@1\b
+  meaning: 'a benchmark score: the share of tasks a model solves correctly on its first attempt.'
+  note: If the number is used, give the plain version.
+- term: pass@k
+  bucket: define
+  plain: share of tasks solved at least once in k tries
+  false_friend: false
   aliases:
   - pass@k
   regex:
-  - \bpass@\d+\b
-  meaning: 'a benchmark score: the share of tasks a model solves correctly on its first attempt.'
-  note: If the number is used, give the plain version.
+  - \bpass@(?:[2-9]|[1-9]\d+)\b
+  meaning: 'a benchmark score: the share of tasks where at least one of k attempts succeeds. It rises with k, so it can hide an agent that fails most of the time.'
+  note: If the number is used, give the plain version and say what k is. For reliability, pass^k (every one of k tries succeeds) is the stricter number.
+- term: pass^k
+  bucket: define
+  plain: share of tasks solved on every one of k tries
+  false_friend: false
+  aliases:
+  - pass^k
+  regex:
+  - \bpass\^(?:k|\d+)(?![\w^])
+  meaning: 'a reliability score: the share of tasks where all k attempts succeed. It falls as k grows.'
+  note: Say what k is.
 - term: slop
   bucket: replace
   plain: low-quality AI output

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+from bisect import bisect_left, bisect_right
 from pathlib import Path
 
 from slopcheck.brief import brief_findings
@@ -137,7 +138,9 @@ def pattern_findings(
             masked = mask_text(line.title_value, scan)
             origins = [(line.number, line.title_column + offset) for offset in range(len(masked))]
             searchable = masked
-        elif line.kind in ("body", "front") and line.text.strip() not in {"", "---"}:
+        elif line.kind == "body" and line.text.strip():
+            # Front matter is checked through its title fields only. Slugs,
+            # dates, tags, and layout keys are not prose.
             masked = mask_text(line.text, scan)
             origins = [(line.number, offset + 1) for offset in range(len(masked))]
             searchable = masked
@@ -204,6 +207,7 @@ def emdash_findings(
     dashes = [(index, item) for index, item in enumerate(stream) if item[0] == "d"]
     if not dashes:
         return []
+    dash_at = [index for index, _item in dashes]
     cap = rule.max_per_window
     window = rule.window_words
     breaches: list[tuple[int, int, int, int]] = []
@@ -214,7 +218,7 @@ def emdash_findings(
         for start in range(0, len(words) - window + 1):
             lo = words[start]
             hi = words[start + window - 1]
-            count = sum(1 for index, _item in dashes if lo <= index <= hi)
+            count = bisect_right(dash_at, hi) - bisect_left(dash_at, lo)
             if count > cap:
                 breaches.append((start, count, lo, hi))
     if not breaches:
@@ -434,6 +438,58 @@ def jargon_findings(
     return findings
 
 
+_LEVEL = {"warning": 1, "error": 2}
+
+
+def _span(item: Finding) -> tuple[int, int] | None:
+    if item.line != item.end_line:
+        return None
+    return item.column, item.end_column
+
+
+def _inside(inner: tuple[int, int], outer: tuple[int, int]) -> bool:
+    return outer[0] <= inner[0] and inner[1] <= outer[1]
+
+
+def drop_nested_findings(findings: list[Finding], pattern_ids: set[str]) -> list[Finding]:
+    """Report one tell once.
+
+    A pattern match that sits inside a longer match of the same category on
+    the same line is dropped, as with "in today's fast-paced" inside "in
+    today's fast-paced world". On an exact tie the first rule id wins. A
+    jargon match inside a pattern match of the same or higher severity is
+    dropped too: "harness" inside "harness the power".
+    """
+    patterns = [
+        (item, _span(item)) for item in findings
+        if item.rule_id in pattern_ids and item.bucket is None and _span(item) is not None
+    ]
+    if not patterns:
+        return findings
+    dropped: set[int] = set()
+    for item in findings:
+        span = _span(item)
+        if span is None:
+            continue
+        is_pattern = item.rule_id in pattern_ids and item.bucket is None
+        is_jargon = item.category == "jargon"
+        if not (is_pattern or is_jargon):
+            continue
+        for other, other_span in patterns:
+            if other is item or other.line != item.line or not _inside(span, other_span):
+                continue
+            if is_pattern:
+                if other.category != item.category:
+                    continue
+                if span == other_span and other.rule_id >= item.rule_id:
+                    continue
+            elif _LEVEL.get(other.severity, 0) < _LEVEL.get(item.severity, 0):
+                continue
+            dropped.add(id(item))
+            break
+    return [item for item in findings if id(item) not in dropped]
+
+
 def check_text(
     text: str,
     path: str = "<stdin>",
@@ -466,6 +522,7 @@ def check_text(
     if briefs:
         findings.extend(brief_findings(lines, path, briefs, opts.brief, scan))
     findings = [item for item in findings if item.category not in blocked and item.rule_id.lower() not in blocked]
+    findings = drop_nested_findings(findings, {pattern.id for pattern in rules.patterns})
     findings.sort(key=lambda item: (item.line, item.column, item.rule_id))
     return findings
 

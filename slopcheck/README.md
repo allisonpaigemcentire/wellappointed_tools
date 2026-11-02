@@ -55,7 +55,9 @@ The jargon file sorts terms into four buckets:
 
 A false friend is a word whose everyday meaning misleads: "agent", "harness", "grounding", "tokens", "temperature", "memory", "reasoning", "hallucination", and any entry marked `false_friend: true`. A false friend cannot sit in Keep. It is flagged on first use when that use has no definition beside it. Replace and cut still win when that is the bucket, so "grounding" is flagged every time.
 
-Replace and cut are also checked in titles: a Markdown heading, and front-matter fields named title, subtitle, excerpt, description, summary, preheader, or subject. A slug is left alone.
+Replace and cut are also checked in titles: a Markdown heading, and front-matter fields named title, subtitle, excerpt, description, summary, preheader, or subject. A slug is left alone. The other front-matter fields (slug, date, tags, layout) are not checked at all.
+
+One tell is reported once. When two patterns in the same category match on one line and one match sits inside the other, only the longer one is reported. A jargon term inside a flagged phrase, such as "harness" in "harness the power", is not reported a second time.
 
 ## Why these rules
 
@@ -131,7 +133,7 @@ Let's dive in. <!-- slopcheck-ok: lets-dive-in - kept on purpose -->
 
 Quoted text, fenced code, and inline code are not scanned. Double quotes count, straight or curly. A title wrapped in YAML quotes is still checked: the quotes are the file format, and the words inside are the title.
 
-HTML comments are not scanned. A bracketed editor note is not scanned either. The default shape is `[NAME: ...]`, where `NAME` is all capitals and a colon. `[EDITOR: a private remark]` drops out. `[AI champions](https://example.com)` does not, because the label is not an all-caps name. Only the link text is checked. The URL of a link or an image is not a gloss, and it is not searched. The alt text of an image is checked, the same way as link text.
+HTML comments are not scanned, including a comment that runs over several lines. A `<!--` inside inline code or a code fence does not open one. A bracketed editor note is not scanned either. The default shape is `[NAME: ...]`, where `NAME` is all capitals and a colon. `[EDITOR: a private remark]` drops out. `[AI champions](https://example.com)` does not, because the label is not an all-caps name. Only the link text is checked. The URL of a link or an image is not a gloss, and it is not searched. The alt text of an image is checked, the same way as link text.
 
 ## Sections you can skip
 
@@ -354,9 +356,9 @@ A directory is paired by relative path. A file that exists only in the edit is a
 
 On the shipped corpus, this is the measured result:
 
-Clean corpus: 6 files, 1148 words, 0 findings, 0.00 false flags per 1,000 words. Labeled corpus: 11 of 11 planted hits, recall 1.00.
+Clean corpus: 6 files, 1015 words, 0 findings, 0.00 false flags per 1,000 words. Labeled corpus: 11 of 11 planted hits, recall 1.00.
 
-The clean files are short public-domain excerpts (Austen, Carroll, Thoreau, Doyle, Shelley, Lincoln), with the source named in each file. Two of them stop before an em dash in the transcription, so this run does not exercise the em-dash rule. Zero false flags on 1,148 words is not a promise about a novel or a newsletter. Point `--clean` at your own folder.
+The clean files are short public-domain excerpts (Austen, Carroll, Thoreau, Doyle, Shelley, Lincoln), with the source named in each file. Two of them stop before an em dash in the transcription, so this run does not exercise the em-dash rule. Zero false flags on 1,015 words is not a promise about a novel or a newsletter. Point `--clean` at your own folder.
 
 The labeled files plant the problems and then ask the checker to find them. Recall of 1.00 on that set overstates accuracy on a real draft. A unit test is not this measurement. The sentence above is the output of `slopcheck bench`.
 

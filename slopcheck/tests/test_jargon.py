@@ -206,3 +206,44 @@ def test_markdown_jargon_block_loads():
     assert {entry["term"] for entry in entries} == {
         "widget", "gizmo", "doohickey", "thingamajig-native", "plainword",
     }
+
+
+def _terms(text):
+    from slopcheck.check import check_text
+    from slopcheck.load import load_jargon, load_rules
+
+    found = check_text(text, "t.md", load_rules(), load_jargon())
+    return [(item.rule_id, item.match, item.suggestion) for item in found if item.category == "jargon"]
+
+
+def test_pass_at_one_and_pass_at_k_are_separate_entries():
+    one = _terms("The model scores 40% pass@1.\n")
+    many = _terms("The model scores 80% pass@5.\n")
+    assert one and one[0][0] == "Pass@1"
+    assert "first try" in one[0][2].lower()
+    assert many and many[0][0] == "pass@k"
+    assert "at least once" in many[0][2].lower()
+    assert "first try" not in many[0][2].lower()
+
+
+def test_pass_hat_k_is_its_own_entry():
+    found = _terms("We report pass^k with k of 8.\n")
+    assert found and found[0][0] == "pass^k"
+    assert "every one" in found[0][2].lower()
+
+
+def test_gemini_context_file_is_listed():
+    assert any(item[1] == "GEMINI.md" for item in _terms("Write GEMINI.md first.\n"))
+
+
+@pytest.mark.parametrize("line", [
+    "The CLI scaffolds the report.",
+    "We scaffold the project first.",
+    "Use it to scaffold a new repo.",
+])
+def test_scaffold_as_a_verb_is_quiet(line):
+    assert _terms(line + "\n") == [], line
+
+
+def test_scaffold_as_a_noun_still_flags():
+    assert any(item[0] == "harness / scaffold" for item in _terms("The agent scaffold failed.\n"))

@@ -238,6 +238,38 @@ def title_span(line: str) -> tuple[str, int] | None:
     return value, column
 
 
+def _blank(line: str, start: int, end: int) -> str:
+    return line[:start] + " " * (end - start) + line[end:]
+
+
+def mask_comment_lines(line: str, in_comment: bool) -> tuple[str, bool]:
+    """Blank the parts of `line` inside an HTML comment that spans lines.
+
+    Returns the line with those parts replaced by spaces of the same length,
+    and whether a comment is still open at the end of the line. A comment
+    that opens and closes on one line is left for `mask_text`.
+    """
+    cursor = 0
+    if in_comment:
+        close = line.find("-->")
+        if close < 0:
+            return " " * len(line), True
+        line = _blank(line, 0, close + 3)
+        cursor = close + 3
+    code = [match.span() for match in CODE_RE.finditer(line)]
+    while True:
+        start = line.find("<!--", cursor)
+        if start < 0:
+            return line, False
+        if any(low <= start < high for low, high in code):
+            cursor = start + 4
+            continue
+        close = line.find("-->", start + 4)
+        if close < 0:
+            return _blank(line, start, len(line)), True
+        cursor = close + 3
+
+
 def classify_lines(text: str, scan: ScanConfig | None = None) -> list[LineInfo]:
     scan = scan or default_scan_config()
     lines = normalize(text).split("\n")
@@ -253,6 +285,7 @@ def classify_lines(text: str, scan: ScanConfig | None = None) -> list[LineInfo]:
     fence_len = 0
     skip_level: int | None = None
     marker_off = False
+    in_comment = False
     for index, line in enumerate(lines):
         number = index + 1
         keys = opt_keys(line)
@@ -264,6 +297,12 @@ def classify_lines(text: str, scan: ScanConfig | None = None) -> list[LineInfo]:
             else:
                 info.append(LineInfo(number, line, "front", keys=keys))
             continue
+        if in_comment or not in_fence:
+            was_open = in_comment
+            line, in_comment = mask_comment_lines(line, in_comment)
+            if was_open and not line.strip():
+                info.append(LineInfo(number, line, "skip", keys=keys))
+                continue
         marker = FENCE_RE.match(line)
         if marker:
             token = marker.group(1)

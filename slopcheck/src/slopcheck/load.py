@@ -243,7 +243,7 @@ def merge_rules(base: RuleSet, text: str, path: str, extra_disable: list[str] | 
         data = yaml.safe_load(text) or {}
     except yaml.YAMLError as exc:
         raise ConfigError(f"{path}: bad YAML: {exc}") from exc
-    em_dash = _em_dash_from(data.get("em_dash"), base.em_dash) if not replace else _em_dash_from(data.get("em_dash"), base.em_dash)
+    em_dash = _em_dash_from(data.get("em_dash"), base.em_dash)
     by_id: dict[str, dict] = {}
     if not replace:
         for pattern in base.patterns:
@@ -254,8 +254,9 @@ def merge_rules(base: RuleSet, text: str, path: str, extra_disable: list[str] | 
                 "pattern": pattern.pattern,
                 "suggestion": pattern.suggestion,
             }
-    for item in disable + list(extra_disable or []):
-        by_id.pop(str(item), None)
+    # Ids are matched without case, the same way --exclude matches them.
+    off = {str(item).lower() for item in disable + list(extra_disable or [])}
+    by_id = {key: value for key, value in by_id.items() if key.lower() not in off}
     for item in patterns:
         if not isinstance(item, dict) or not item.get("id"):
             raise ConfigError(f"{path}: a pattern needs an id")

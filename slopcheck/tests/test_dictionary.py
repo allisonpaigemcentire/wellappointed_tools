@@ -13,8 +13,8 @@ def test_bucket_counts():
     buckets = {}
     for entry in ENTRIES:
         buckets[entry["bucket"]] = buckets.get(entry["bucket"], 0) + 1
-    assert buckets == {"keep": 6, "define": 47, "replace": 10, "cut": 5}
-    assert len(ENTRIES) == 68
+    assert buckets == {"keep": 6, "define": 49, "replace": 10, "cut": 5}
+    assert len(ENTRIES) == 70
 
 
 def test_required_placements_and_translations():

@@ -37,6 +37,41 @@ patterns:
   severity: error
   pattern: \bunlock(s|ed|ing)? the (power|potential)\b
   suggestion: Say what becomes possible, with a number if you have one.
+- id: unlock-new-levels
+  category: ai-tell
+  severity: error
+  pattern: \bunlock(s|ed|ing)? (new|unprecedented|greater) (levels?|heights)\b
+  suggestion: Say what becomes possible, with a number if you have one.
+- id: possibilities-endless
+  category: ai-tell
+  severity: error
+  pattern: \bpossibilities are (endless|limitless|infinite)\b
+  suggestion: Name two things it makes possible.
+- id: best-yet-to-come
+  category: ai-tell
+  severity: error
+  pattern: \bthe best is yet to come\b
+  suggestion: Cut the closer, or say what ships next and when.
+- id: speak-for-themselves
+  category: ai-tell
+  severity: warning
+  pattern: \b(results|numbers|data|facts|metrics) speaks? for (themselves|itself)\b
+  suggestion: Give the numbers and let the reader judge.
+- id: ahead-of-the-curve
+  category: ai-tell
+  severity: warning
+  pattern: \b(stay|stays|stayed|staying|keep|keeps|keeping|get|getting) ahead of the curve\b
+  suggestion: Say what you do earlier than others, and by how much.
+- id: commitment-to-excellence
+  category: ai-tell
+  severity: warning
+  pattern: \bcommitment to (excellence|quality|innovation)\b
+  suggestion: Name the practice that shows it.
+- id: shines-through
+  category: ai-tell
+  severity: warning
+  pattern: \b(shines?|shone|shining) through\b
+  suggestion: Say what the reader will notice, concretely.
 - id: harness-potential
   category: ai-tell
   severity: error
@@ -80,7 +115,7 @@ patterns:
 - id: embark-journey
   category: ai-tell
   severity: error
-  pattern: \bembark(s|ed|ing)? on (a|the|this|your) journey\b
+  pattern: \bembark(s|ed|ing)? on (a|an|the|this|your|our) ([a-z-]+ ){0,2}journey\b
   suggestion: Use start, or name the first step.
 - id: lets-dive-in
   category: ai-tell
@@ -385,13 +420,18 @@ patterns:
 - id: isnt-its
   category: contrast-frame
   severity: error
-  pattern: \b(?:is|are|was|were)n['’]t (?:just |only )?(?:about )?[^.,;]{1,60}, (?:it(?:['’]s| is)|they(?:['’]re| are))\b
+  pattern: \b(?:is|are|was|were)n['’]t (?:just |only |merely |simply )?(?:about )?[^.,;—–]{1,60}?\s*(?:,|;|—|–|--)\s*(?:it(?:['’]s| is)|they(?:['’]re| are))\b
   suggestion: State the claim directly.
 - id: not-about-its-about
   category: contrast-frame
   severity: error
-  pattern: \b(?:it['’]s|it is) not about [^.;]{1,60}, (?:it['’]s|it is) about\b
+  pattern: \b(?:it['’]s|it is) not (?:just |only |merely |simply )?about [^.;—–]{1,60}?\s*(?:,|;|—|–|--)\s*(?:it['’]s|it is) (?:all )?about\b
   suggestion: State what it is about.
+- id: dont-just-we
+  category: contrast-frame
+  severity: error
+  pattern: \b(?:we|it|they|you|i) (?:do|does|did)(?:n['’]t| not) (?:just|only|merely|simply) [^.;!?—–]{1,60}?(?:[.;!]|\s*—|\s*–|\s*--)\s*(?:we|it|they|you|i)\b
+  suggestion: Say what you do. Drop the smaller claim it is set against.
 - id: reveal-question
   category: reveal-fragment
   severity: error
