@@ -253,8 +253,9 @@ def _order_spans(records: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """
     if not records or not all(_looks_like_span(record) for record in records):
         return records
-    starts = [_span_start(record) for record in records]
-    if any(start is None for start in starts):
+    raw = [_span_start(record) for record in records]
+    starts = [start for start in raw if start is not None]
+    if len(starts) != len(raw):
         return records
     order = sorted(range(len(records)), key=lambda index: starts[index])
     return [records[index] for index in order]
