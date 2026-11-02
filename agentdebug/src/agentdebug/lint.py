@@ -169,6 +169,7 @@ def _attach_parents(tree: ast.AST) -> None:
 
 
 def _swallowed_exceptions(tree: ast.AST, display: str) -> list[Finding]:
+    """AGT001: handlers that hide an error, including a broad except that returns an empty value."""
     findings: list[Finding] = []
     for node in ast.walk(tree):
         if not isinstance(node, ast.ExceptHandler):
@@ -205,6 +206,7 @@ def _handler_is_pass(node: ast.ExceptHandler) -> bool:
 
 
 def _is_broad_handler(node: ast.ExceptHandler) -> bool:
+    """True for a bare except or one that catches Exception or BaseException."""
     if node.type is None:
         return True
     names = node.type.elts if isinstance(node.type, ast.Tuple) else [node.type]
@@ -225,6 +227,7 @@ def _handler_returns_empty(node: ast.ExceptHandler) -> bool:
 
 
 def _is_empty_value(node: ast.AST | None) -> bool:
+    """True when a returned value is empty: None, an empty literal, or False."""
     if node is None:
         return True
     if isinstance(node, ast.Constant):
@@ -333,6 +336,7 @@ def _dict_is_hardcoded_pass(node: ast.Dict) -> bool:
 
 
 def _unbounded_loops(tree: ast.AST, display: str) -> list[Finding]:
+    """AGT003 and AGT004: `while True` loops that call a model, a tool, or a retry with no cap that ends the loop."""
     findings: list[Finding] = []
     for node in ast.walk(tree):
         if not isinstance(node, ast.While):
@@ -382,6 +386,7 @@ def _try_retries_a_call(node: ast.Try) -> bool:
 
 
 def _is_network_call(node: ast.Call) -> bool:
+    """True when the call looks like an HTTP request or urlopen."""
     parts = _strip_self(_chain(node.func))
     if not parts:
         return False
@@ -456,14 +461,17 @@ def _has_iteration_cap(loop: ast.While) -> bool:
 
 
 def _if_exits(node: ast.If) -> bool:
+    """True when the if body breaks, returns, or raises."""
     return any(isinstance(item, (ast.Break, ast.Return, ast.Raise)) for stmt in node.body for item in ast.walk(stmt))
 
 
 def _cap_name(name: str) -> bool:
+    """True for a name that reads as an iteration cap, not a token limit such as max_tokens."""
     return bool(_MAX_NAME.search(name)) and not _TOKEN_LIMIT_NAME.search(name)
 
 
 def _compare_names(test: ast.AST) -> list[str]:
+    """Names and attribute names used anywhere in a test expression."""
     names: list[str] = []
     for item in ast.walk(test):
         if isinstance(item, ast.Name):
@@ -474,6 +482,7 @@ def _compare_names(test: ast.AST) -> list[str]:
 
 
 def _test_is_counter_cap(test: ast.AST) -> bool:
+    """True when a test compares a counter against an iteration cap."""
     if isinstance(test, ast.BoolOp):
         return any(_test_is_counter_cap(value) for value in test.values)
     if not isinstance(test, ast.Compare):
@@ -489,6 +498,7 @@ def _test_is_counter_cap(test: ast.AST) -> bool:
 
 
 def _silent_truncation(tree: ast.AST, display: str) -> list[Finding]:
+    """AGT005: prefix slices of model or tool text that are not just logged."""
     findings: list[Finding] = []
     for node in ast.walk(tree):
         if not isinstance(node, ast.Subscript) or not isinstance(node.slice, ast.Slice):
@@ -523,6 +533,7 @@ def _inside_log_call(node: ast.AST) -> bool:
 
 
 def _is_log_call(node: ast.Call) -> bool:
+    """True for print, a logger call, or a write to sys.stdout or sys.stderr."""
     parts = _strip_self(_chain(node.func))
     if not parts:
         return False
@@ -535,6 +546,7 @@ def _is_log_call(node: ast.Call) -> bool:
 
 
 def _is_std_stream_write(parts: list[str]) -> bool:
+    """True for a sys.stdout or sys.stderr method call."""
     return len(parts) >= 3 and parts[0] == "sys" and parts[1] in _STD_STREAMS
 
 
@@ -555,6 +567,7 @@ def _slice_name(node: ast.AST) -> str | None:
 
 
 def _missing_timeouts(tree: ast.AST, display: str) -> list[Finding]:
+    """AGT006: network calls with no timeout, unless the client was built with one."""
     findings: list[Finding] = []
     covered = _clients_with_timeout(tree)
     for node in ast.walk(tree):
@@ -600,12 +613,14 @@ def _clients_with_timeout(tree: ast.AST) -> set[str]:
 
 
 def _strip_self(parts: list[str]) -> list[str]:
+    """Drop a leading self or cls from a call chain."""
     if len(parts) > 1 and parts[0] in _SELF_NAMES:
         return parts[1:]
     return parts
 
 
 def _needs_timeout(node: ast.Call) -> bool:
+    """True when the call is a network request that should carry a timeout."""
     parts = _strip_self(_chain(node.func))
     if not parts:
         return False
@@ -656,6 +671,7 @@ def _ungated_write_tools(tree: ast.AST, display: str) -> list[Finding]:
 
 
 def _is_tool(fn: ast.FunctionDef | ast.AsyncFunctionDef) -> bool:
+    """True when the function is a tool by name or by its decorator."""
     if _TOOL_NAME.search(fn.name):
         return True
     for deco in fn.decorator_list:
@@ -677,6 +693,7 @@ def _has_approval(fn: ast.FunctionDef | ast.AsyncFunctionDef) -> bool:
 
 
 def _writes_or_sends(fn: ast.FunctionDef | ast.AsyncFunctionDef) -> bool:
+    """True when the function writes, sends, or deletes, ignoring stdout and stderr writes."""
     if re.match(r"(?i)^(send|write|delete|publish|email|post|execute|remove)_", fn.name):
         return True
     for node in ast.walk(fn):
@@ -705,6 +722,7 @@ def _open_mode(node: ast.Call) -> str | None:
 
 
 def _secrets(tree: ast.AST, display: str) -> list[Finding]:
+    """AGT008: string constants that look like API keys or tokens."""
     findings: list[Finding] = []
     seen: set[int] = set()
     prefix = _secret_prefix()
@@ -841,6 +859,7 @@ def _has_keyword(node: ast.Call, name: str) -> bool:
 
 
 def _dict_pairs(node: ast.Dict) -> dict[str, ast.AST]:
+    """String keys of a dict literal mapped to their values."""
     pairs: dict[str, ast.AST] = {}
     for key, value in zip(node.keys, node.values, strict=True):
         if isinstance(key, ast.Constant) and isinstance(key.value, str) and value is not None:
