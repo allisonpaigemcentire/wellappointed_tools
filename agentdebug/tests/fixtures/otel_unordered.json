@@ -1,0 +1,5 @@
+{"resourceSpans":[{"scopeSpans":[{"spans":[
+ {"traceId":"t","spanId":"c","parentSpanId":"a","name":"execute_tool send","startTimeUnixNano":"3000","attributes":[{"key":"gen_ai.operation.name","value":{"stringValue":"execute_tool"}},{"key":"gen_ai.tool.name","value":{"stringValue":"send"}}],"status":{"code":2,"message":"timeout"}},
+ {"traceId":"t","spanId":"b","parentSpanId":"a","name":"execute_tool lookup","startTimeUnixNano":"2000","attributes":[{"key":"gen_ai.operation.name","value":{"stringValue":"execute_tool"}},{"key":"gen_ai.tool.name","value":{"stringValue":"lookup"}},{"key":"error.type","value":{"stringValue":"not_found"}}]},
+ {"traceId":"t","spanId":"a","name":"invoke_agent shopper","startTimeUnixNano":"1000","attributes":[{"key":"gen_ai.operation.name","value":{"stringValue":"invoke_agent"}},{"key":"gen_ai.agent.name","value":{"stringValue":"shopper"}}]}
+]}]}]}
