@@ -289,3 +289,16 @@ def test_front_matter_must_be_at_the_top():
 def test_a_page_that_opens_with_a_thematic_break_is_still_checked():
     text = "---\n\nWe should delve into this.\n\n---\n\nMore text.\n"
     assert [item.line for item in hits(text) if item.rule_id == "delve"] == [3]
+
+
+# Regression cases from the 2026-11-02 Debugging Bot review.
+
+
+def test_a_closer_inside_a_code_fence_does_not_close_a_mid_line_opener():
+    text = "Type <!-- to open a comment.\n```\n-->\n```\nWe should delve here.\n"
+    assert [item.rule_id for item in hits(text) if item.rule_id == "delve"] == ["delve"]
+
+
+def test_front_matter_key_may_start_with_a_non_ascii_letter():
+    text = "---\nñame: Notes\nslug: delve-into-the-tapestry\n---\nThe tests passed.\n"
+    assert hits(text) == []

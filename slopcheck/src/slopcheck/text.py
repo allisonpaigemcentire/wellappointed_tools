@@ -24,7 +24,7 @@ LIST_RE = re.compile(r"^\s*(?:[-*+]|\d+[.)])\s+")
 TABLE_RE = re.compile(r"^\s*\|")
 HR_RE = re.compile(r"^(?:-{3,}|\*{3,}|_{3,})\s*$")
 # A YAML mapping key at the start of a front-matter line: `slug: x` or `"key": x`.
-FRONT_KEY_RE = re.compile(r"""^(?:[A-Za-z0-9_][\w .-]*|"[^"]*"|'[^']*')\s*:(?:\s|$)""")
+FRONT_KEY_RE = re.compile(r"""^(?:\w[\w .-]*|"[^"]*"|'[^']*')\s*:(?:\s|$)""")
 TITLE_RE = re.compile(
     r"^(\s*)(title|subtitle|excerpt|description|summary|preheader|subject)\s*:\s*(.*)$",
     re.I,
@@ -246,14 +246,15 @@ def _blank(line: str, start: int, end: int) -> str:
 
 
 def _closes_ahead(lines: list[str]) -> list[bool]:
-    """For each index i, whether `-->` comes in lines[i:] before a blank line ends the paragraph.
+    """For each index i, whether `-->` comes in lines[i:] before a blank line or a code fence ends the paragraph.
 
     Built once, back to front, so a page full of stray openers stays linear.
     """
     ahead = [False] * (len(lines) + 1)
     for index in range(len(lines) - 1, -1, -1):
         line = lines[index]
-        if not line.strip():
+        if not line.strip() or FENCE_RE.match(line):
+            # A fence ends the paragraph. A `-->` inside a code block cannot close the comment.
             ahead[index] = False
         elif "-->" in line:
             ahead[index] = True
