@@ -73,6 +73,22 @@ def test_trace_summarize_text_and_json():
     assert broken.returncode == 2
 
 
+def test_trace_summarize_unrecognized_file_exits_2(tmp_path: Path):
+    path = tmp_path / "notes.jsonl"
+    path.write_text('{"kind": "note"}\n{"kind": "note"}\n', encoding="utf-8")
+    result = _run("trace", "summarize", str(path))
+    assert result.returncode == 2
+    assert "no recognized fields" in result.stderr
+    assert result.stdout == ""
+
+
+def test_trace_summarize_claude_code_session():
+    result = _run("trace", "summarize", str(FIXTURES / "claude_session.jsonl"))
+    assert result.returncode == 0
+    assert "first_error_step: 3" in result.stdout
+    assert "error=Bash: Error: exit 1" in result.stdout
+
+
 def test_report_init_from_cli(tmp_path: Path):
     created = _run("report", "init", "Desk lamp checkout", cwd=tmp_path)
     assert created.returncode == 0

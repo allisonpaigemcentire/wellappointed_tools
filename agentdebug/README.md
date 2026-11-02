@@ -70,11 +70,13 @@ agentdebug trace summarize trace.jsonl
 agentdebug trace summarize spans.json --format json
 ```
 
-The text report lists, per step, the agent, the operation, tool calls, the error, and token counts. It also prints consecutive repeated steps, tools that appear at least three times, and the first step that carries an error. That step is the first recorded error, which you still have to check against the playbook's "first upstream failure" rule. The command exits `2` if the file cannot be parsed. A trace that contains errors still exits `0`; the errors are the content of the summary.
+The text report lists, per step, the agent, the operation, tool calls, the error, and token counts. It also prints consecutive repeated steps, tools that appear at least three times, and the first step that carries an error. That step is the first recorded error, which you still have to check against the playbook's "first upstream failure" rule. The command exits `2` if the file cannot be parsed, or if it parses but no step has an agent, a tool call, or an error. That second case usually means the file is in a shape this command does not read, and an empty summary would hide the errors in it. A trace that contains errors still exits `0`; the errors are the content of the summary.
+
+Two steps count as a repeat only when the agent, operation, tool names, and tool arguments all match, so `search(q=lamp)` followed by `search(q=desk lamp brass)` is not a repeat. The text view prints each step's tool arguments after `args=`, shortened to 120 characters. The JSON view has them whole in `tool_arguments`. Tool outputs are not in the summary.
 
 ### Trace schema
 
-Two shapes are accepted.
+Three shapes are accepted.
 
 **Simple JSONL.** One JSON object per line (a JSON array of those objects works too):
 
@@ -89,9 +91,11 @@ Two shapes are accepted.
 }
 ```
 
-`tokens` may instead be `input_tokens` and `output_tokens`, or a `usage` object with `prompt_tokens` and `completion_tokens`. `error` may be a string. An error on a tool call object is reported as `tool-name: message`. `step` is optional; lines are numbered in order when it is missing.
+`tokens` may instead be `input_tokens` and `output_tokens`, or a `usage` object with `prompt_tokens` and `completion_tokens`. `error` may be a string. An error on a tool call object is reported as `tool-name: message`. `step` is optional; lines are numbered in order when it is missing. `name` is read as the agent, unless the record also names that tool or its `operation` or `type` mentions a tool, as in `{"type": "tool_call", "name": "search"}`. Then `name` is the tool.
 
-**OpenTelemetry GenAI spans.** A JSON array of span objects, or an OTLP `resourceSpans` document. Attributes may be a map or the OTLP list of `{key, value}` pairs. The summarizer reads `gen_ai.agent.name`, `gen_ai.operation.name`, `gen_ai.tool.name`, `gen_ai.usage.input_tokens`, `gen_ai.usage.output_tokens`, `error.type`, span status, and tool events. See the [GenAI span conventions](https://opentelemetry.io/docs/specs/semconv/gen-ai/gen-ai-spans/).
+**OpenTelemetry GenAI spans.** A JSON array of span objects, or an OTLP `resourceSpans` document. Attributes may be a map or the OTLP list of `{key, value}` pairs. The summarizer reads `gen_ai.agent.name`, `gen_ai.operation.name`, `gen_ai.tool.name`, `gen_ai.usage.input_tokens`, `gen_ai.usage.output_tokens`, `error.type`, span status, and tool events, and `gen_ai.tool.call.arguments`. Spans are put in `startTimeUnixNano` order, because exporters often write a child before its parent. If any span has no start time, file order is kept. A span with no agent name takes it from the nearest ancestor through `parentSpanId`. See the [GenAI span conventions](https://opentelemetry.io/docs/specs/semconv/gen-ai/gen-ai-spans/).
+
+**Claude Code session JSONL.** The files under `~/.claude/projects/<project>/`. Each `user` or `assistant` line is a step, with agent `claude-code` (or `claude-code:sidechain` for a subagent line). `tool_use` blocks are tool calls, with their `input` as arguments, and a `tool_result` with `is_error: true` is the step's error, reported as `tool-name: message`. `summary` and snapshot lines are skipped. The format is not a published schema, so a future Claude Code release may change it. Cursor and Gemini CLI transcripts are not read yet.
 
 ```bash
 PYTHONPATH=src python3 -m agentdebug trace summarize tests/fixtures/trace.jsonl

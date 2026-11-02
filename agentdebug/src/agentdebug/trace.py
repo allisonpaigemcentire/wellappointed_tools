@@ -17,9 +17,20 @@ class StepView:
     error: str | None = None
     input_tokens: int | None = None
     output_tokens: int | None = None
+    # One entry per tool call, in the same order: the call's arguments, or None.
+    tool_arguments: list[Any] = field(default_factory=list)
 
-    def signature(self) -> tuple[str, str, tuple[str, ...]]:
-        return (self.agent, self.operation, tuple(self.tool_calls))
+    def signature(self) -> tuple[str, str, tuple[str, ...], tuple[str, ...]]:
+        """Two steps repeat only when the agent, operation, tools, and tool arguments all match."""
+        args = tuple(_canonical(value) for value in self.tool_arguments)
+        return (self.agent, self.operation, tuple(self.tool_calls), args)
+
+    def recognized(self) -> bool:
+        return bool(self.agent or self.tool_calls or self.error)
+
+
+class UnrecognizedTraceError(ValueError):
+    """The file parsed as JSON, but no step had an agent, a tool, or an error."""
 
 
 @dataclass
@@ -61,7 +72,18 @@ def summarize_path(path: Path) -> TraceSummary:
 
 def summarize_text(text: str) -> TraceSummary:
     records = _load_records(text)
-    steps = [_to_step(record, position) for position, record in enumerate(records, start=1)]
+    session = [record for record in records if not _is_claude_meta(record)]
+    if session and all(_looks_like_claude_code(record) for record in session):
+        steps = _claude_code_steps(records)
+    else:
+        records = _order_spans(records)
+        agents = _span_agents(records)
+        steps = [_to_step(record, position, agents) for position, record in enumerate(records, start=1)]
+    if steps and not any(step.recognized() for step in steps):
+        raise UnrecognizedTraceError(
+            f"no recognized fields in {len(steps)} records: no step has an agent, a tool call, or an error. "
+            "See Trace schema in the agentdebug README for the accepted shapes."
+        )
     return _summarize(steps)
 
 
@@ -79,10 +101,12 @@ def format_text(summary: TraceSummary) -> str:
     for step in summary.steps:
         tools = ",".join(step.tool_calls) if step.tool_calls else "-"
         error = step.error if step.error else "-"
+        args = _args_label(step)
         lines.append(
             f"step {step.index} agent={step.agent or '-'} operation={step.operation or '-'} "
             f"tools={tools} error={error} "
             f"input_tokens={_num(step.input_tokens)} output_tokens={_num(step.output_tokens)}"
+            + (f" args={args}" if args else "")
         )
     if summary.repeats:
         lines.append("")
@@ -103,6 +127,31 @@ def format_text(summary: TraceSummary) -> str:
 
 def _num(value: int | None) -> str:
     return "-" if value is None else str(value)
+
+
+_ARGS_PREVIEW = 120
+
+
+def _args_label(step: StepView) -> str:
+    """Compact tool arguments for the text view. The JSON view keeps them whole."""
+    if not any(value is not None for value in step.tool_arguments):
+        return ""
+    label = ";".join(_canonical(value) for value in step.tool_arguments)
+    if len(label) > _ARGS_PREVIEW:
+        cut = len(label) - _ARGS_PREVIEW
+        label = label[:_ARGS_PREVIEW] + f"...(+{cut} chars, see --format json)"
+    return label
+
+
+def _canonical(value: Any) -> str:
+    if value is None:
+        return "-"
+    if isinstance(value, str):
+        return value
+    try:
+        return json.dumps(value, sort_keys=True, separators=(",", ":"))
+    except (TypeError, ValueError):
+        return str(value)
 
 
 def _load_records(text: str) -> list[dict[str, Any]]:
@@ -162,10 +211,75 @@ def _otlp_spans(payload: dict[str, Any]) -> list[dict[str, Any]]:
     return spans
 
 
-def _to_step(record: dict[str, Any], position: int) -> StepView:
+def _to_step(record: dict[str, Any], position: int, agents: dict[str, str] | None = None) -> StepView:
     if _looks_like_span(record):
-        return _span_to_step(record, position)
+        step = _span_to_step(record, position)
+        if not step.agent and agents:
+            step.agent = _inherited_agent(record, agents)
+        return step
     return _simple_to_step(record, position)
+
+
+_START_KEYS = ("startTimeUnixNano", "start_time_unix_nano", "startTimeUnixNanos")
+_SPAN_ID_KEYS = ("spanId", "span_id")
+_PARENT_ID_KEYS = ("parentSpanId", "parent_span_id", "parentId", "parent_id")
+
+
+def _span_start(record: dict[str, Any]) -> int | None:
+    for key in _START_KEYS:
+        if key in record:
+            return _as_int(record[key])
+    return None
+
+
+def _order_spans(records: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Put OTel spans in start-time order. Exporters often write children before parents.
+
+    The sort is stable, so spans with the same start keep file order. If any span has
+    no start time, the file order is kept for the whole trace.
+    """
+    if not records or not all(_looks_like_span(record) for record in records):
+        return records
+    starts = [_span_start(record) for record in records]
+    if any(start is None for start in starts):
+        return records
+    order = sorted(range(len(records)), key=lambda index: starts[index])
+    return [records[index] for index in order]
+
+
+def _span_id(record: dict[str, Any], keys: tuple[str, ...]) -> str | None:
+    for key in keys:
+        value = record.get(key)
+        if isinstance(value, str) and value:
+            return value
+    return None
+
+
+def _span_agents(records: list[dict[str, Any]]) -> dict[str, Any]:
+    """Map span id to (parent id, own agent name) so a tool span can inherit its agent."""
+    tree: dict[str, Any] = {}
+    for record in records:
+        if not _looks_like_span(record):
+            continue
+        span_id = _span_id(record, _SPAN_ID_KEYS)
+        if span_id is None:
+            continue
+        attrs = _flatten_attrs(record.get("attributes"))
+        agent = record.get("gen_ai.agent.name") or attrs.get("gen_ai.agent.name") or attrs.get("gen_ai.agent.id")
+        tree[span_id] = (_span_id(record, _PARENT_ID_KEYS), str(agent) if agent else "")
+    return tree
+
+
+def _inherited_agent(record: dict[str, Any], tree: dict[str, Any]) -> str:
+    parent = _span_id(record, _PARENT_ID_KEYS)
+    seen: set[str] = set()
+    while parent and parent in tree and parent not in seen:
+        seen.add(parent)
+        grandparent, agent = tree[parent]
+        if agent:
+            return agent
+        parent = grandparent
+    return ""
 
 
 def _looks_like_span(record: dict[str, Any]) -> bool:
@@ -189,12 +303,21 @@ def _simple_to_step(record: dict[str, Any], position: int) -> StepView:
     index = record.get("step", record.get("index", position))
     if not isinstance(index, int):
         index = position
-    agent = _first_str(record, "agent", "agent_name", "name") or ""
     operation = _first_str(record, "operation", "type", "role") or ""
     tools = _tool_names(record.get("tool_calls"))
+    arguments = _tool_arguments(record.get("tool_calls"))
     single = _first_str(record, "tool", "tool_name")
+    agent = _first_str(record, "agent", "agent_name") or ""
+    name = _first_str(record, "name")
+    if name and not agent:
+        # A record such as {"type": "tool_call", "name": "search"} names a tool, not an agent.
+        if single is None and not tools and "tool" in operation.lower():
+            single = name
+        elif single is None or single != name:
+            agent = name
     if single and single not in tools:
         tools.append(single)
+        arguments.append(record.get("arguments", record.get("args", record.get("input"))))
     error = _clean_error(record.get("error"))
     if error is None:
         for tool in record.get("tool_calls") or []:
@@ -213,7 +336,22 @@ def _simple_to_step(record: dict[str, Any], position: int) -> StepView:
         error=error,
         input_tokens=input_tokens,
         output_tokens=output_tokens,
+        tool_arguments=arguments if any(value is not None for value in arguments) else [],
     )
+
+
+def _tool_arguments(value: Any) -> list[Any]:
+    """Arguments for each named entry in tool_calls, matching _tool_names order."""
+    if not isinstance(value, list):
+        return []
+    found: list[Any] = []
+    for item in value:
+        if isinstance(item, str) and item:
+            found.append(None)
+        elif isinstance(item, dict) and (item.get("name") or item.get("tool") or item.get("tool_name")):
+            raw = item.get("arguments", item.get("args", item.get("input")))
+            found.append(_parse_json_string(raw))
+    return found
 
 
 def _span_to_step(record: dict[str, Any], position: int) -> StepView:
@@ -228,9 +366,11 @@ def _span_to_step(record: dict[str, Any], position: int) -> StepView:
     )
     operation = str(attrs.get("gen_ai.operation.name") or record.get("name") or "")
     tools: list[str] = []
+    arguments: list[Any] = []
     tool_name = attrs.get("gen_ai.tool.name")
     if tool_name:
         tools.append(str(tool_name))
+        arguments.append(_parse_json_string(attrs.get("gen_ai.tool.call.arguments")))
     for event in record.get("events") or []:
         if not isinstance(event, dict):
             continue
@@ -245,6 +385,7 @@ def _span_to_step(record: dict[str, Any], position: int) -> StepView:
             continue
         if label not in tools:
             tools.append(label)
+            arguments.append(_parse_json_string(event_attrs.get("gen_ai.tool.call.arguments")))
     error = _span_error(record, attrs)
     input_tokens = _as_int(
         attrs.get("gen_ai.usage.input_tokens", attrs.get("gen_ai.usage.prompt_tokens"))
@@ -260,7 +401,17 @@ def _span_to_step(record: dict[str, Any], position: int) -> StepView:
         error=error,
         input_tokens=input_tokens,
         output_tokens=output_tokens,
+        tool_arguments=arguments if any(value is not None for value in arguments) else [],
     )
+
+
+def _parse_json_string(value: Any) -> Any:
+    if isinstance(value, str):
+        try:
+            return json.loads(value)
+        except json.JSONDecodeError:
+            return value
+    return value
 
 
 def _span_error(record: dict[str, Any], attrs: dict[str, Any]) -> str | None:
@@ -336,6 +487,89 @@ def _otlp_value(raw: Any) -> Any:
     return raw
 
 
+_CLAUDE_TYPES = {"user", "assistant", "system"}
+_CLAUDE_META_TYPES = {"summary", "file-history-snapshot", "queue-operation"}
+
+
+def _is_claude_meta(record: dict[str, Any]) -> bool:
+    return record.get("type") in _CLAUDE_META_TYPES
+
+
+def _looks_like_claude_code(record: dict[str, Any]) -> bool:
+    """A Claude Code session line: {"type": "user"|"assistant", "message": {...}, "uuid": ...}."""
+    if record.get("type") not in _CLAUDE_TYPES:
+        return False
+    if "uuid" not in record and "sessionId" not in record:
+        return False
+    return record.get("type") == "system" or isinstance(record.get("message"), dict)
+
+
+def _claude_code_steps(records: list[dict[str, Any]]) -> list[StepView]:
+    """Steps from a Claude Code session JSONL (~/.claude/projects/<project>/<session>.jsonl).
+
+    Each user or assistant line is a step. tool_use blocks become tool calls with their
+    input as arguments. A tool_result with is_error true is reported as `tool: message`
+    on the step that carries the result.
+    """
+    tool_names: dict[str, str] = {}
+    steps: list[StepView] = []
+    for record in records:
+        if _is_claude_meta(record) or record.get("type") == "system":
+            continue
+        message = record.get("message") or {}
+        role = str(message.get("role") or record.get("type") or "")
+        agent = "claude-code:sidechain" if record.get("isSidechain") else "claude-code"
+        content = message.get("content")
+        blocks = content if isinstance(content, list) else []
+        tools: list[str] = []
+        arguments: list[Any] = []
+        error: str | None = None
+        results = 0
+        for block in blocks:
+            if not isinstance(block, dict):
+                continue
+            kind = block.get("type")
+            if kind == "tool_use":
+                name = str(block.get("name") or "tool")
+                tools.append(name)
+                arguments.append(block.get("input"))
+                if isinstance(block.get("id"), str):
+                    tool_names[block["id"]] = name
+            elif kind == "tool_result":
+                results += 1
+                if block.get("is_error") and error is None:
+                    name = tool_names.get(str(block.get("tool_use_id")), "tool")
+                    error = f"{name}: {_result_text(block.get('content')) or 'error'}"
+        usage = message.get("usage") if isinstance(message.get("usage"), dict) else {}
+        operation = "tool_result" if results and role == "user" else role
+        steps.append(
+            StepView(
+                index=len(steps) + 1,
+                agent=agent,
+                operation=operation,
+                tool_calls=tools,
+                error=error,
+                input_tokens=_as_int(usage.get("input_tokens")),
+                output_tokens=_as_int(usage.get("output_tokens")),
+                tool_arguments=arguments if any(value is not None for value in arguments) else [],
+            )
+        )
+    return steps
+
+
+def _result_text(content: Any) -> str:
+    if isinstance(content, str):
+        return " ".join(content.split())[:200]
+    if isinstance(content, list):
+        parts = [
+            str(block.get("text"))
+            for block in content
+            if isinstance(block, dict) and block.get("type") == "text" and block.get("text")
+        ]
+        return " ".join(" ".join(parts).split())[:200]
+    return ""
+
+
 def _summarize(steps: list[StepView]) -> TraceSummary:
     first_error = next((step.index for step in steps if step.error), None)
     repeats = _consecutive_repeats(steps)
@@ -369,7 +603,7 @@ def _consecutive_repeats(steps: list[StepView]) -> list[Repeat]:
         while end < len(steps) and steps[end].signature() == signature:
             end += 1
         length = end - index
-        agent, operation, tools = signature
+        agent, operation, tools, _args = signature
         meaningful = bool(agent or operation or tools)
         if length >= 2 and meaningful:
             repeats.append(
