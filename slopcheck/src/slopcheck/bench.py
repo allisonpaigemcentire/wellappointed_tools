@@ -232,8 +232,7 @@ def format_report(report: BenchReport) -> str:
             rows.append(f"  {rule}: {count}")
     if report.quiet_violations:
         rows.append(f"Allowlist slips: {report.quiet_violations}.")
-    for note in report.notes:
-        rows.append(note)
+    rows.extend(report.notes)
     return "\n".join(rows) + "\n"
 
 

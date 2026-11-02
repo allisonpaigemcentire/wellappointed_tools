@@ -77,7 +77,7 @@ def _overlap(left: list[str], right: list[str]) -> float:
 def _ngrams(words: list[str], size: int) -> set[tuple[str, ...]]:
     if len(words) < size:
         return set()
-    return {tuple(words[index:index + size]) for index in range(0, len(words) - size + 1)}
+    return {tuple(words[index:index + size]) for index in range(len(words) - size + 1)}
 
 
 def _too_close(output: list[str], source: list[str], config: BriefConfig) -> tuple[bool, float, str]:

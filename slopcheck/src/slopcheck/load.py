@@ -119,7 +119,7 @@ def jargon_yaml_text(text: str, path: str) -> str:
         if JARGON_START not in text or JARGON_END not in text:
             raise ConfigError(f"{path}: no {JARGON_START} … {JARGON_END} block")
         inner = text.split(JARGON_START, 1)[1].split(JARGON_END, 1)[0]
-        match = re.search(r"```ya?ml\s*\n(.*?)\n```", inner, re.S)
+        match = re.search(r"```ya?ml\s*\n(.*?)\n```", inner, re.DOTALL)
         if not match:
             raise ConfigError(f"{path}: the jargon-data block has no fenced yaml section")
         return match.group(1)

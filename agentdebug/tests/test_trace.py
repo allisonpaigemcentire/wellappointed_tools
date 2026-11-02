@@ -3,7 +3,12 @@
 import json
 from pathlib import Path
 
-from agentdebug.trace import UnrecognizedTraceError, format_text, summarize_path, summarize_text
+from agentdebug.trace import (
+    UnrecognizedTraceError,
+    format_text,
+    summarize_path,
+    summarize_text,
+)
 
 FIXTURES = Path(__file__).parent / "fixtures"
 

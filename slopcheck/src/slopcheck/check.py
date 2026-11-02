@@ -42,17 +42,17 @@ JARGON_AFTER = re.compile(
     r"""|\s*\(|\s*:\s|\s+[–-]\s"""
     r"""|\s+(?:is|are)\s+(?:a|an|the|what|when|where|how|any|just|simply|shorthand|short for)\b"""
     r"""|\s+(?:means|mean|refers? to|stands? for)\b)""",
-    re.I,
+    re.IGNORECASE,
 )
 JARGON_BEFORE = re.compile(
     r"""(?:what\s+(?:we|people|vendors|you|they|the industry|researchers|engineers)\s+calls?|called|known as|dubbed|so-called)"""
     r"""\s*["“‘'*_`]*\s*(?:(?:a|an|the)\s+)?$|\(\s*$""",
-    re.I,
+    re.IGNORECASE,
 )
 JARGON_NEXT_OPENER = re.compile(
     r"""^["“*_`(]*(?:that is|in other words|put simply|meaning|this means|that means|by that|"""
     r"""(?:it|this|that|they|these|those)\s+(?:is|are|means|refers)\b|it's\s+an?\b)""",
-    re.I,
+    re.IGNORECASE,
 )
 
 PROSE_SUFFIXES = {".md", ".markdown", ".txt", ".rst", ".adoc"}
@@ -217,7 +217,7 @@ def emdash_findings(
         if len(dashes) > cap:
             breaches.append((0, len(dashes), 0, max(len(stream) - 1, 0)))
     else:
-        for start in range(0, len(words) - window + 1):
+        for start in range(len(words) - window + 1):
             lo = words[start]
             hi = words[start + window - 1]
             count = bisect_right(dash_at, hi) - bisect_left(dash_at, lo)
@@ -240,7 +240,7 @@ def emdash_findings(
             continue
         # Point at the dash that crossed the limit.
         picked = inside[min(cap, len(inside) - 1)]
-        span = len(words) if len(words) <= window else window
+        span = min(len(words), window)
         suggestion = (
             f"{count} em dashes in {span} words (limit is {cap} per {window}). {rule.suggestion}"
         )

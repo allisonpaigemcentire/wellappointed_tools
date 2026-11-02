@@ -4,8 +4,8 @@ The author credit is allowed only in the credit files. The credit string is
 read from pyproject.toml so this test does not keep a second copy of the name.
 """
 
-from pathlib import Path
 import tomllib
+from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 SKIP_DIRS = {".git", "uploads", "__pycache__", ".pytest_cache", ".venv", "venv", "dist", "build", "tests"}
