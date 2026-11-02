@@ -420,7 +420,7 @@ patterns:
 - id: isnt-its
   category: contrast-frame
   severity: error
-  pattern: \b(?:is|are|was|were)n['’]t (?:just |only |merely |simply )?(?:about )?[^.,;—–]{1,60}?\s*(?:,|;|—|–|--)\s*(?:it(?:['’]s| is)|they(?:['’]re| are))\b
+  pattern: \b(?:is|are|was|were)n['’]t (?:just |only |merely |simply )?(?:about )?[^.,;—–]{1,60}?\s*(?:,|;|—|–|--)\s*(?:it(?:['’]s| is)|they(?:['’]re| are))\b(?!\s+(?:also|too|even|still)\b)
   suggestion: State the claim directly.
 - id: not-about-its-about
   category: contrast-frame
@@ -430,9 +430,10 @@ patterns:
 - id: dont-just-we
   category: contrast-frame
   severity: error
-  # A comma joins the two halves as often as a full stop. "It doesn't only X. It also Y."
+  # A comma joins the two halves as often as a full stop, so the first half stops at a comma.
+  # "It doesn't only X. It also Y."
   # adds a claim instead of trading one away, so a following also, too, or even is left alone.
-  pattern: \b(?:we|it|they|you|i) (?:do|does|did)(?:n['’]t| not) (?:just|only|merely|simply) [^.;!?—–]{1,60}?(?:[.;!,]|\s*—|\s*–|\s*--)\s*(?:we|it|they|you|i)\b(?!\s+(?:also|too|even|still)\b)
+  pattern: \b(?:we|it|they|you|i) (?:do|does|did)(?:n['’]t| not) (?:just|only|merely|simply) [^.;!?,—–]{1,60}?(?:[.;!,]|\s*—|\s*–|\s*--)\s*(?:we|it|they|you|i)\b(?!\s+(?:also|too|even|still)\b)
   suggestion: Say what you do. Drop the smaller claim it is set against.
 - id: reveal-question
   category: reveal-fragment

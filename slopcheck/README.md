@@ -55,7 +55,7 @@ The jargon file sorts terms into four buckets:
 
 A false friend is a word whose everyday meaning misleads: "agent", "harness", "grounding", "tokens", "temperature", "memory", "reasoning", "hallucination", and any entry marked `false_friend: true`. A false friend cannot sit in Keep. It is flagged on first use when that use has no definition beside it. Replace and cut still win when that is the bucket, so "grounding" is flagged every time.
 
-Replace and cut are also checked in titles: a Markdown heading, and front-matter fields named title, subtitle, excerpt, description, summary, preheader, or subject. A slug is left alone. The other front-matter fields (slug, date, tags, layout) are not checked at all. Front matter is the block between a `---` on the first line and the next `---`, when every line in it reads as YAML. A page that opens with a `---` rule and a paragraph is checked as prose.
+Replace and cut are also checked in titles: a Markdown heading, and front-matter fields named title, subtitle, excerpt, description, summary, preheader, or subject. The other front-matter fields (slug, date, tags, layout) are not checked at all. Front matter is the block between a `---` on the first line and the next `---`, when every line in it reads as YAML. A page that opens with a `---` rule and a paragraph is checked as prose.
 
 One tell is reported once. When two patterns in the same category match on one line and one match sits inside the other, only the longer one is reported. A jargon term inside a flagged phrase, such as "harness" in "harness the power", is not reported a second time.
 

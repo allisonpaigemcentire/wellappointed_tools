@@ -263,6 +263,9 @@ def test_contrast_frame_flags_a_comma_join(line):
 @pytest.mark.parametrize("line", [
     "It doesn't only fail on Windows. It also fails on macOS.",
     "They don't only test it; they even fuzz it.",
+    "We don't just test, we also lint, we ship.",
+    "The cache isn't warm yet — it is still loading.",
+    "They aren't cheap, they're also slow.",
 ])
 def test_not_only_also_adds_a_claim_and_is_not_a_contrast_frame(line):
     assert hits(line + "\n", "contrast-frame") == [], line
