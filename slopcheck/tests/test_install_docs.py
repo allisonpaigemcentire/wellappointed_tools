@@ -109,3 +109,8 @@ def test_no_doc_tells_you_to_install_agentdebug_from_pypi():
     assert offenders == {}
     assert not bare.search('pip install "agentdebug @ git+https://example.invalid#subdirectory=agentdebug"')
     assert bare.search("pip install agentdebug")
+
+
+def test_readme_gives_the_recovery_for_a_wrong_order_rename():
+    readme = (Path(__file__).resolve().parents[1] / "README.md").read_text(encoding="utf-8")
+    assert "--force-reinstall --no-deps \"wellappointed-slopcheck @ git+" in readme
