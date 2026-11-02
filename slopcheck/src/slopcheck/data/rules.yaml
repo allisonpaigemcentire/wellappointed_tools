@@ -95,12 +95,12 @@ patterns:
 - id: in-todays-world
   category: ai-tell
   severity: error
-  pattern: in today['’]?s? (rapidly[- ]evolving |ever[- ]changing |fast[- ]paced )?(world|landscape|era|age)
+  pattern: \bin today['’]?s? (rapidly[- ]evolving |ever[- ]changing |fast[- ]paced )?(world|landscape|era|age)
   suggestion: Open with the concrete problem or a number.
 - id: in-todays-fast-paced
   category: ai-tell
   severity: error
-  pattern: in today['’]s fast[- ]paced
+  pattern: \bin today['’]s fast[- ]paced
   suggestion: Open with the concrete problem or a number.
 - id: gone-are-the-days
   category: ai-tell

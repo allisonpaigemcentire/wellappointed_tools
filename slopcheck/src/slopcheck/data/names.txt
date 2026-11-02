@@ -1,0 +1,23 @@
+# Names that count even when they only show up at the start of a sentence.
+# One name per line. A # starts a comment. Matching is case-insensitive.
+# These are public-domain literary names from the shipped bench excerpts, not
+# a contact list. Add names for a project under known_names in .slopcheck.yaml.
+Alice
+Adler
+Austen
+Bennet
+Bingley
+Carroll
+Darcy
+Doyle
+Elizabeth
+Holmes
+Irene
+Lincoln
+Margaret
+Morris
+Netherfield
+Shelley
+Sherlock
+Thoreau
+Watson

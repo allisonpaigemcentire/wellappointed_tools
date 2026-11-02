@@ -9,7 +9,8 @@ from __future__ import annotations
 import re
 
 from slopcheck.model import Suggestion
-from slopcheck.text import ScanConfig, classify_lines, mask_text
+from slopcheck.names import confirmed_names
+from slopcheck.text import ScanConfig, classify_lines, mask_text, prose_sentences
 
 TOKEN_RE = re.compile(r"[A-Za-z][A-Za-z0-9'+]*(?:-[A-Za-z0-9'+]+)*")
 MIN_LENGTH = 4
@@ -53,13 +54,24 @@ def suggest_terms(
     limit: int = 40,
     frequency=None,
     scan: ScanConfig | None = None,
+    known_names: set[str] | None = None,
 ) -> list[Suggestion]:
-    """Return rare words not already in the dictionary, rarest first."""
+    """Return rare words not already in the dictionary, rarest first.
+
+    A capitalised word is skipped as a name only when it also appears
+    capitalised mid-sentence, or it is on the known-names list. A capital
+    that exists only because the sentence starts is still a candidate.
+    """
     freq = frequency or zipf_frequency
     known = known_terms(entries)
+    classified = classify_lines(text, scan)
+    names = confirmed_names(
+        [sentence.text for sentence in prose_sentences(classified, scan)],
+        known_names,
+    )
     counts: dict[str, int] = {}
     first_line: dict[str, int] = {}
-    for line in classify_lines(text, scan):
+    for line in classified:
         if line.kind in {"code", "skip"}:
             continue
         source = line.title_value if line.kind == "title" and line.title_value is not None else line.text
@@ -71,7 +83,7 @@ def suggest_terms(
             if len(token) < MIN_LENGTH:
                 continue
             key = token.lower()
-            if key in known or any(char.isdigit() for char in key):
+            if key in known or key in names or any(char.isdigit() for char in key):
                 continue
             counts[key] = counts.get(key, 0) + 1
             first_line.setdefault(key, line.number)

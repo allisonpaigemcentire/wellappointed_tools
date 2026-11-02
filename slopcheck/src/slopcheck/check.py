@@ -5,16 +5,28 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
+from slopcheck.brief import brief_findings
+from slopcheck.damage import damage_findings
 from slopcheck.load import SEVERITY_RANK, RuleSet
 from slopcheck.model import Finding
+from slopcheck.names import (
+    confirmed_names,
+    is_unconfirmed_sentence_start,
+    match_is_confirmed_name,
+)
+from slopcheck.options import CheckOptions, default_options
+from slopcheck.repetition import repetition_findings
+from slopcheck.rhythm import rhythm_findings
 from slopcheck.text import (
     ScanConfig,
     Sentence,
     body_sentences,
     classify_lines,
     front_sentences,
+    is_structural_line,
     mask_text,
     normalize,
+    prose_sentences,
     suppressed,
 )
 
@@ -90,15 +102,35 @@ def _finding_at(
     )
 
 
+def _line_continues(lines: list, index: int) -> bool:
+    """True when this body line carries on the sentence from the line above."""
+    if index <= 0:
+        return False
+    prev = lines[index - 1]
+    if prev.kind != "body" or not prev.text.strip() or is_structural_line(prev.text):
+        return False
+    tail = prev.text.rstrip()
+    return not re.search(r"""[.!?…]["”’)\]*_]*\s*$""", tail)
+
+
+def _at_sentence_start(line_text: str, word_index: int, continues: bool) -> bool:
+    prefix = line_text[:word_index]
+    if not prefix.strip():
+        return not continues
+    return bool(re.search(r"""[.!?…]["”’)\]*_]*\s*$""", prefix))
+
+
 def pattern_findings(
     lines: list,
     path: str,
     rules: RuleSet,
     exclude: set[str],
     scan: ScanConfig | None = None,
+    names: set[str] | None = None,
 ) -> list[Finding]:
     findings: list[Finding] = []
-    for line in lines:
+    known = names or set()
+    for index, line in enumerate(lines):
         if line.kind == "code" or line.kind == "skip":
             continue
         if line.kind == "title" and line.title_value is not None and line.title_column is not None:
@@ -114,14 +146,23 @@ def pattern_findings(
         for pattern in rules.patterns:
             if pattern.category in exclude or pattern.id in exclude:
                 continue
+            continues = _line_continues(lines, index) if line.kind == "body" else False
             for match in pattern.rx.finditer(searchable):
                 shown = _clean_match(match.group(0))
                 if not shown:
                     continue
+                span_start = match.start()
+                if pattern.sentence_start:
+                    raw = match.group(0)
+                    span_start = match.start() + (len(raw) - len(raw.lstrip()))
+                    if not _at_sentence_start(searchable, span_start, continues):
+                        continue
+                if known and match_is_confirmed_name(shown, known):
+                    continue
                 if suppressed(line.keys, rule_id=pattern.id, category=pattern.category, bucket=None):
                     continue
                 findings.append(_finding_at(
-                    path, origins, match.start(), match.end(), line.number,
+                    path, origins, span_start, match.end(), line.number,
                     severity=pattern.severity,
                     category=pattern.category,
                     rule_id=pattern.id,
@@ -280,12 +321,55 @@ def _line_keys(lines, number: int) -> set[str]:
     return set()
 
 
+def _case_sensitive_hit(entry: dict, matched: str) -> bool:
+    """True when the hit came from a (?-i:...) pattern and not from a plain alias."""
+    sensitive = False
+    insensitive = False
+    for source, pattern in entry["rx"]:
+        if pattern.search(matched):
+            if "(?-i:" in str(source):
+                sensitive = True
+            else:
+                insensitive = True
+    return sensitive and not insensitive
+
+
+def _demote_sentence_start_name(
+    sentence: str,
+    start: int,
+    end: int,
+    entry: dict,
+    matched: str,
+    entries: list[dict],
+    names: set[str],
+) -> tuple[int, int, dict, str, bool]:
+    """Drop a keep-hit that is only capitalised because the sentence starts.
+
+    Returns drop=True when the capital is not a confirmed name and no lowercase
+    entry covers the same span. Otherwise returns the entry to report, which
+    may be the generic one (Copilot the product vs copilot the noun).
+    """
+    if entry["bucket"] != "keep" or not _case_sensitive_hit(entry, matched):
+        return start, end, entry, matched, False
+    if not is_unconfirmed_sentence_start(sentence, start, matched, names):
+        return start, end, entry, matched, False
+    span = sentence[start:end]
+    alt = sentence[:start] + span.lower() + sentence[end:]
+    for alt_start, alt_end, alt_entry, _alt_matched in jargon_matches(alt, entries):
+        if alt_entry is entry or alt_entry["bucket"] == "keep":
+            continue
+        if alt_start < end and alt_end > start:
+            return alt_start, alt_end, alt_entry, sentence[alt_start:alt_end], False
+    return start, end, entry, matched, True
+
+
 def jargon_findings(
     lines: list,
     path: str,
     entries: list[dict],
     exclude: set[str],
     scan: ScanConfig | None = None,
+    names: set[str] | None = None,
 ) -> list[Finding]:
     front = front_sentences(lines, scan)
 
@@ -297,10 +381,16 @@ def jargon_findings(
     body = [sentence for sentence in body_sentences(lines, scan) if not skips_jargon(sentence)]
     findings: list[Finding] = []
     seen_first: set[int] = set()
+    known = names or set()
 
     def consider(sentence: Sentence, nxt: str | None, *, allow_define: bool) -> None:
         keys = _line_keys(lines, sentence.line)
         for start, end, entry, matched in jargon_matches(sentence.masked, entries):
+            start, end, entry, matched, drop = _demote_sentence_start_name(
+                sentence.masked, start, end, entry, matched, entries, known,
+            )
+            if drop:
+                continue
             bucket = entry["bucket"]
             if bucket == "keep":
                 continue
@@ -351,17 +441,30 @@ def check_text(
     jargon: list[dict] | None = None,
     exclude: set[str] | None = None,
     scan: ScanConfig | None = None,
+    options: CheckOptions | None = None,
+    briefs: list[str] | None = None,
 ) -> list[Finding]:
-    """Check one document. `jargon` None skips the dictionary."""
+    """Check one document. `jargon` None skips the dictionary.
+
+    `briefs` are the prompt, outline, or brief texts, not paths. The brief
+    check stays quiet when the list is empty.
+    """
     if rules is None:
         from slopcheck.load import load_rules
         rules = load_rules()
+    opts = options or default_options()
     blocked = {item.lower() for item in (exclude or set())}
     lines = classify_lines(normalize(text), scan)
-    findings = pattern_findings(lines, path, rules, blocked, scan)
+    names = confirmed_names([sentence.text for sentence in prose_sentences(lines, scan)], opts.known_names)
+    findings = pattern_findings(lines, path, rules, blocked, scan, names)
     findings.extend(emdash_findings(lines, path, rules, scan))
     if jargon is not None:
-        findings.extend(jargon_findings(lines, path, jargon, blocked, scan))
+        findings.extend(jargon_findings(lines, path, jargon, blocked, scan, names))
+    findings.extend(repetition_findings(lines, path, opts.repetition, scan))
+    findings.extend(rhythm_findings(lines, path, opts.rhythm, scan))
+    findings.extend(damage_findings(lines, path, opts.damage, scan))
+    if briefs:
+        findings.extend(brief_findings(lines, path, briefs, opts.brief, scan))
     findings = [item for item in findings if item.category not in blocked and item.rule_id.lower() not in blocked]
     findings.sort(key=lambda item: (item.line, item.column, item.rule_id))
     return findings
@@ -395,6 +498,8 @@ def check_paths(
     jargon: list[dict] | None,
     exclude: set[str] | None = None,
     scan: ScanConfig | None = None,
+    options: CheckOptions | None = None,
+    briefs: list[str] | None = None,
 ) -> tuple[list[Finding], int, list[str]]:
     """Check files. Returns findings, file count, and notes about skipped files."""
     findings: list[Finding] = []
@@ -413,6 +518,6 @@ def check_paths(
                 notes.append(f"skipped binary file {file}")
                 continue
             count += 1
-            findings.extend(check_text(text, str(file), rules, jargon, exclude, scan))
+            findings.extend(check_text(text, str(file), rules, jargon, exclude, scan, options, briefs))
     findings.sort(key=lambda item: (item.path, item.line, item.column, item.rule_id))
     return findings, count, notes

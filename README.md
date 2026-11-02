@@ -8,7 +8,7 @@ Shared developer tools. Clone the repository and use the project you need. Each 
 
 ## slopcheck
 
-[slopcheck](slopcheck/README.md) flags prose that reads like a model wrote it, and AI jargon a reader cannot check. It prints the line, the column, the matched words, and a plain-language fix. Run it on a file, a folder, or a pipe. Install notes, the jargon rules, and the pre-commit sample are in that directory.
+[slopcheck](slopcheck/README.md) flags prose that reads like a model wrote it, and AI jargon a reader cannot check. It also flags a repeated phrase, a sentence copied from a brief, a flat rhythm, and a few edit leftovers such as a doubled word. It prints the line, the column, the matched words, and a plain-language fix. Run it on a file, a folder, or a pipe. Install notes, the jargon rules, and the pre-commit sample are in that directory.
 
 ## License
 

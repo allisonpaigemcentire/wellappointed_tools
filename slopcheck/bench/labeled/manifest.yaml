@@ -1,0 +1,16 @@
+# Synthetic planted problems. Recall here overstates accuracy on real drafts.
+cases:
+  - file: repeated.md
+    expect: [repeated-phrase, near-duplicate]
+  - file: brief-copy.md
+    briefs: [briefs/outline.md]
+    expect: [brief-leak]
+    quiet:
+      - {line: 3, rule: brief-leak}
+  - file: rhythm.md
+    expect: [rhythm-flat, rhythm-run]
+  - file: damage.md
+    expect: [lowercase-start, doubled-word, duplicated-clause, dangling-punct, duplicated-sentence]
+  - file: function-word.md
+    missing_function_word: true
+    expect: [missing-function-word]

@@ -31,6 +31,47 @@ class Finding:
         return data
 
 
+def finding_at(
+    path: str,
+    origins: list[tuple[int, int]] | None,
+    start: int,
+    end: int,
+    fallback_line: int,
+    *,
+    severity: str,
+    category: str,
+    rule_id: str,
+    match: str,
+    suggestion: str,
+    bucket: str | None = None,
+    false_friend: bool = False,
+) -> Finding:
+    """Point a finding at a span. `origins` maps each character to line and column."""
+    if origins:
+        start = min(max(start, 0), len(origins) - 1)
+        last = min(max(end - 1, 0), len(origins) - 1)
+        line, column = origins[start]
+        end_line, end_column = origins[last]
+        end_column += 1
+    else:
+        line = column = end_line = fallback_line
+        end_column = column + len(match)
+    return Finding(
+        path=path,
+        line=line,
+        column=column,
+        end_line=end_line,
+        end_column=end_column,
+        severity=severity,
+        category=category,
+        rule_id=rule_id,
+        match=match,
+        suggestion=suggestion,
+        bucket=bucket,
+        false_friend=false_friend,
+    )
+
+
 @dataclass
 class Summary:
     files: int = 0
