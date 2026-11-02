@@ -420,11 +420,10 @@ def main(argv: list[str] | None = None) -> int:
                                 blobs.append((str(file), text))
             combined_suggestions = []
             for label, text in blobs:
-                for item in suggest_terms(
+                combined_suggestions.extend(suggest_terms(
                     text, jargon, zipf_below=zipf_below, limit=limit, scan=scan,
                     known_names=options.known_names,
-                ):
-                    combined_suggestions.append(item)
+                ))
             combined_suggestions.sort(key=lambda item: (item.zipf, item.term))
             suggestions = combined_suggestions[:limit]
         except SuggestError as exc:

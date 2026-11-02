@@ -14,7 +14,15 @@ import re
 
 from slopcheck.model import Finding, finding_at
 from slopcheck.options import DamageConfig
-from slopcheck.text import ABBR, LineInfo, ScanConfig, _join, line_suppressed, mask_text, prose_paragraphs
+from slopcheck.text import (
+    ABBR,
+    LineInfo,
+    ScanConfig,
+    _join,
+    line_suppressed,
+    mask_text,
+    prose_paragraphs,
+)
 from slopcheck.tokens import word_count
 
 # A sentence end, then a lowercase word. Abbreviations are filtered afterwards.

@@ -138,7 +138,7 @@ def _ngrams(
     for size in range(min_n, max_n + 1):
         if len(content_at) < size:
             break
-        for offset in range(0, len(content_at) - size + 1):
+        for offset in range(len(content_at) - size + 1):
             chosen = content_at[offset:offset + size]
             if any(chosen[pos + 1] - chosen[pos] - 1 > max_gap for pos in range(size - 1)):
                 continue
@@ -265,7 +265,7 @@ def _passage_findings(
     if width < 2 or len(sentences) < width * 2:
         return []
     windows: list[tuple[int, list[str], Sentence]] = []
-    for start in range(0, len(sentences) - width + 1):
+    for start in range(len(sentences) - width + 1):
         chunk = sentences[start:start + width]
         tokens: list[str] = []
         for sentence in chunk:

@@ -8,7 +8,13 @@ from pathlib import Path
 import pytest
 
 from slopcheck.cli import main
-from slopcheck.load import ConfigError, load_jargon, load_rules, merge_jargon, merge_rules
+from slopcheck.load import (
+    ConfigError,
+    load_jargon,
+    load_rules,
+    merge_jargon,
+    merge_rules,
+)
 
 
 def write(tmp_path: Path, text: str, name: str = "note.md") -> Path:

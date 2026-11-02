@@ -186,7 +186,7 @@ def _load_records(text: str) -> list[dict[str, Any]]:
         except json.JSONDecodeError as exc:
             raise ValueError(f"line {line_no} is not valid JSON: {exc.msg}") from exc
         if not isinstance(item, dict):
-            raise ValueError(f"line {line_no} must be a JSON object")
+            raise ValueError(f"line {line_no} must be a JSON object")  # noqa: TRY004 -- callers and the CLI catch ValueError for bad trace input
         records.extend(_records_from_json(item))
     return records
 
@@ -196,11 +196,11 @@ def _records_from_json(data: Any) -> list[dict[str, Any]]:
         records: list[dict[str, Any]] = []
         for index, item in enumerate(data, start=1):
             if not isinstance(item, dict):
-                raise ValueError(f"item {index} must be a JSON object")
+                raise ValueError(f"item {index} must be a JSON object")  # noqa: TRY004 -- callers and the CLI catch ValueError for bad trace input
             records.extend(_records_from_json(item))
         return records
     if not isinstance(data, dict):
-        raise ValueError("trace JSON must be an object, an array, or JSONL objects")
+        raise ValueError("trace JSON must be an object, an array, or JSONL objects")  # noqa: TRY004 -- callers and the CLI catch ValueError for bad trace input
     if "resourceSpans" in data:
         return _otlp_spans(data)
     if "spans" in data and isinstance(data["spans"], list):

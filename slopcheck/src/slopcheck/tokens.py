@@ -29,7 +29,7 @@ STOPWORDS = frozenset(
     he'll she'll we'll they'll i'd you'd he'd she'd we'd they'd don't doesn't
     didn't can't couldn't won't wouldn't shouldn't isn't aren't wasn't weren't
     haven't hasn't hadn't
-    """.split()
+    """.split()  # noqa: SIM905 -- a word block is easier to read and edit than a 169-item list
 )
 
 
@@ -41,9 +41,7 @@ def is_stopword(word: str) -> bool:
     key = norm_token(word)
     if key in STOPWORDS:
         return True
-    if key.endswith("'s") and key[:-2] in STOPWORDS:
-        return True
-    return False
+    return key.endswith("'s") and key[:-2] in STOPWORDS
 
 
 def is_content_word(word: str) -> bool:

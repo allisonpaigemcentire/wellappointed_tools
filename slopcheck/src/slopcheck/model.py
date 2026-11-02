@@ -105,9 +105,7 @@ def over_threshold(summary: Summary, max_errors: int, max_warnings: int) -> bool
     """
     if max_errors >= 0 and summary.errors > max_errors:
         return True
-    if max_warnings >= 0 and summary.warnings > max_warnings:
-        return True
-    return False
+    return max_warnings >= 0 and summary.warnings > max_warnings
 
 
 @dataclass

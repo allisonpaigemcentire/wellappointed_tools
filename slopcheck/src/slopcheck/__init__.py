@@ -12,9 +12,9 @@ __version__ = "0.2.0"
 
 __all__ = [
     "ConfigError",
+    "__version__",
     "check_paths",
     "check_text",
     "load_jargon",
     "load_rules",
-    "__version__",
 ]

@@ -169,6 +169,7 @@ def test_bad_editor_note_pattern_exits_2(tmp_path, monkeypatch, capsys):
 
 def test_compile_helpers_reject_bad_lists():
     import pytest
+
     from slopcheck.load import ConfigError
     with pytest.raises(ConfigError):
         compile_editor_notes("nope")

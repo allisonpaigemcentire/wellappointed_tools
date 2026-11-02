@@ -2,7 +2,7 @@
 
 from pathlib import Path
 
-import agentdebug.lint as lint
+from agentdebug import lint
 from agentdebug.lint import lint_path
 
 FIXTURES = Path(__file__).parent / "fixtures"

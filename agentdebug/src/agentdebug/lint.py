@@ -248,9 +248,7 @@ def _is_empty_value(node: ast.AST | None) -> bool:
 def _is_noop(stmt: ast.stmt) -> bool:
     if isinstance(stmt, ast.Pass):
         return True
-    if isinstance(stmt, ast.Expr) and isinstance(stmt.value, ast.Constant) and stmt.value.value is Ellipsis:
-        return True
-    return False
+    return isinstance(stmt, ast.Expr) and isinstance(stmt.value, ast.Constant) and stmt.value.value is Ellipsis
 
 
 def _hardcoded_gates(tree: ast.AST, display: str) -> list[Finding]:
@@ -688,9 +686,7 @@ def _needs_timeout(node: ast.Call) -> bool:
         return True
     if last in _HTTP_METHODS and _looks_like_http(parts):
         return True
-    if last in _LLM_CALL_NAMES and any(part.lower() in _LLM_CONTEXT for part in parts[:-1]):
-        return True
-    return False
+    return last in _LLM_CALL_NAMES and any(part.lower() in _LLM_CONTEXT for part in parts[:-1])
 
 
 def _looks_like_http(parts: list[str]) -> bool:
@@ -869,9 +865,7 @@ def _target_is_secret(target: ast.AST) -> bool:
 def _assigned_secret(value: str) -> bool:
     if len(value) < 12:
         return False
-    if _SAFE_SECRET.search(value):
-        return False
-    return True
+    return not _SAFE_SECRET.search(value)
 
 
 def _secret_prefix() -> re.Pattern[str]:
@@ -904,9 +898,7 @@ def _is_llm_or_tool_call(node: ast.Call) -> bool:
         return True
     if last in {"run", "call", "__call__"} and any(part.lower() in {"llm", "tool", "agent"} for part in parts[:-1]):
         return True
-    if last in {"call_tool", "use_tool", "execute_tool", "run_agent"}:
-        return True
-    return False
+    return last in {"call_tool", "use_tool", "execute_tool", "run_agent"}
 
 
 def _chain(node: ast.AST) -> list[str]:

@@ -45,9 +45,7 @@ def _sentence_initial(text: str, word_start: int) -> bool:
         return True
     if _SENT_END.search(prefix):
         return True
-    if _QUOTE_OPEN.search(prefix):
-        return True
-    return False
+    return bool(_QUOTE_OPEN.search(prefix))
 
 
 def names_in_sentence(sentence: str) -> set[str]:

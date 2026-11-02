@@ -15,7 +15,7 @@ from dataclasses import dataclass, field
 from slopcheck.load import ConfigError
 
 QUOTE_RE = re.compile(r'"[^"\n]*"|“[^”\n]*”')
-COMMENT_RE = re.compile(r"<!--.*?-->", re.S)
+COMMENT_RE = re.compile(r"<!--.*?-->", re.DOTALL)
 CODE_RE = re.compile(r"`[^`\n]{1,400}`")
 URL_RE = re.compile(r"https?://\S+")
 FENCE_RE = re.compile(r"^[ ]{0,3}(`{3,}|~{3,})")
@@ -27,11 +27,11 @@ HR_RE = re.compile(r"^(?:-{3,}|\*{3,}|_{3,})\s*$")
 FRONT_KEY_RE = re.compile(r"""^(?:\w[\w .-]*|"[^"]*"|'[^']*')\s*:(?:\s|$)""")
 TITLE_RE = re.compile(
     r"^(\s*)(title|subtitle|excerpt|description|summary|preheader|subject)\s*:\s*(.*)$",
-    re.I,
+    re.IGNORECASE,
 )
-OPT_RE = re.compile(r"<!--\s*slop(?:check)?-ok:\s*([^>]*?)\s*-->", re.I)
-OFF_LINE = re.compile(r"^<!--\s*slopcheck-off\s*-->$", re.I)
-ON_LINE = re.compile(r"^<!--\s*slopcheck-on\s*-->$", re.I)
+OPT_RE = re.compile(r"<!--\s*slop(?:check)?-ok:\s*([^>]*?)\s*-->", re.IGNORECASE)
+OFF_LINE = re.compile(r"^<!--\s*slopcheck-off\s*-->$", re.IGNORECASE)
+ON_LINE = re.compile(r"^<!--\s*slopcheck-on\s*-->$", re.IGNORECASE)
 # Opening "[" or "![", the link text, then "](url)". The text is kept.
 LINK_RE = re.compile(r"(!?\[)([^\]]*)(\]\((?:[^()\n]|\([^()\n]*\))*\))")
 HEADING_PARTS = re.compile(r"^(#{1,6})\s+(.*?)\s*#*\s*$")
@@ -46,8 +46,8 @@ DEFAULT_SKIP_HEADINGS = (
 )
 _OPT_NOTES = (
     re.compile(r"\s*\([^)]*\)\s*$"),
-    re.compile(r"\s+-\s+.*$", re.S),
-    re.compile(r"\s+[—–]\s*.*$", re.S),
+    re.compile(r"\s+-\s+.*$", re.DOTALL),
+    re.compile(r"\s+[—–]\s*.*$", re.DOTALL),
 )
 ABBR = (
     "e.g.", "i.e.", "vs.", "etc.", "Mr.", "Ms.", "Mrs.", "Dr.", "St.",
@@ -199,9 +199,7 @@ def suppressed(keys: set[str], *, rule_id: str, category: str, bucket: str | Non
         return True
     if rule_id.lower() in keys or category.lower() in keys:
         return True
-    if bucket and (bucket.lower() in keys or "jargon" in keys):
-        return True
-    return False
+    return bool(bucket) and (bucket.lower() in keys or "jargon" in keys)
 
 
 @dataclass
