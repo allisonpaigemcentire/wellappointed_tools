@@ -26,6 +26,7 @@ class StepView:
         return (self.agent, self.operation, tuple(self.tool_calls), args)
 
     def recognized(self) -> bool:
+        """True when the step names an agent, a tool call, or an error."""
         return bool(self.agent or self.tool_calls or self.error)
 
 
@@ -71,6 +72,7 @@ def summarize_path(path: Path) -> TraceSummary:
 
 
 def summarize_text(text: str) -> TraceSummary:
+    """Summarize a JSONL, OpenTelemetry, or Claude Code trace. Raises UnrecognizedTraceError when no step names an agent, a tool, or an error."""
     records = _load_records(text)
     session = [record for record in records if not _is_claude_meta(record)]
     if session and all(_looks_like_claude_code(record) for record in session):
@@ -88,6 +90,7 @@ def summarize_text(text: str) -> TraceSummary:
 
 
 def format_text(summary: TraceSummary) -> str:
+    """Render a summary as plain text. Long tool arguments are cut, with a pointer to --format json."""
     lines = [
         f"steps: {len(summary.steps)}",
         f"first_error_step: {summary.first_error_step if summary.first_error_step is not None else '-'}",
@@ -144,6 +147,7 @@ def _args_label(step: StepView) -> str:
 
 
 def _canonical(value: Any) -> str:
+    """A stable string for a value, so equal tool arguments compare equal."""
     if value is None:
         return "-"
     if isinstance(value, str):
@@ -212,6 +216,7 @@ def _otlp_spans(payload: dict[str, Any]) -> list[dict[str, Any]]:
 
 
 def _to_step(record: dict[str, Any], position: int, agents: dict[str, str] | None = None) -> StepView:
+    """Turn one record into a step. A span with no agent takes the agent of its nearest ancestor."""
     if _looks_like_span(record):
         step = _span_to_step(record, position)
         if not step.agent and agents:
@@ -226,6 +231,7 @@ _PARENT_ID_KEYS = ("parentSpanId", "parent_span_id", "parentId", "parent_id")
 
 
 def _span_start(record: dict[str, Any]) -> int | None:
+    """The span start time as an integer, or None when the span has none."""
     for key in _START_KEYS:
         if key in record:
             return _as_int(record[key])
@@ -248,6 +254,7 @@ def _order_spans(records: list[dict[str, Any]]) -> list[dict[str, Any]]:
 
 
 def _span_id(record: dict[str, Any], keys: tuple[str, ...]) -> str | None:
+    """The first non-empty id found under the given keys."""
     for key in keys:
         value = record.get(key)
         if isinstance(value, str) and value:
@@ -271,6 +278,7 @@ def _span_agents(records: list[dict[str, Any]]) -> dict[str, Any]:
 
 
 def _inherited_agent(record: dict[str, Any], tree: dict[str, Any]) -> str:
+    """Walk up parent span ids and return the first agent name found. Stops on a cycle."""
     parent = _span_id(record, _PARENT_ID_KEYS)
     seen: set[str] = set()
     while parent and parent in tree and parent not in seen:
@@ -300,6 +308,7 @@ def _looks_like_span(record: dict[str, Any]) -> bool:
 
 
 def _simple_to_step(record: dict[str, Any], position: int) -> StepView:
+    """Turn a flat JSONL record into a step."""
     index = record.get("step", record.get("index", position))
     if not isinstance(index, int):
         index = position
@@ -355,6 +364,7 @@ def _tool_arguments(value: Any) -> list[Any]:
 
 
 def _span_to_step(record: dict[str, Any], position: int) -> StepView:
+    """Turn an OpenTelemetry span into a step, reading the GenAI attributes."""
     attrs = _flatten_attrs(record.get("attributes"))
     for key in ("gen_ai.operation.name", "gen_ai.agent.name", "gen_ai.tool.name", "gen_ai.usage.input_tokens"):
         if key in record and key not in attrs:
@@ -406,6 +416,7 @@ def _span_to_step(record: dict[str, Any], position: int) -> StepView:
 
 
 def _parse_json_string(value: Any) -> Any:
+    """Parse a JSON string, or return the value unchanged."""
     if isinstance(value, str):
         try:
             return json.loads(value)
@@ -492,6 +503,7 @@ _CLAUDE_META_TYPES = {"summary", "file-history-snapshot", "queue-operation"}
 
 
 def _is_claude_meta(record: dict[str, Any]) -> bool:
+    """True for Claude Code records that carry no turn, such as a summary line."""
     return record.get("type") in _CLAUDE_META_TYPES
 
 
@@ -558,6 +570,7 @@ def _claude_code_steps(records: list[dict[str, Any]]) -> list[StepView]:
 
 
 def _result_text(content: Any) -> str:
+    """The text of a Claude Code tool result, on one line and cut to 200 characters."""
     if isinstance(content, str):
         return " ".join(content.split())[:200]
     if isinstance(content, list):
@@ -595,6 +608,7 @@ def _summarize(steps: list[StepView]) -> TraceSummary:
 
 
 def _consecutive_repeats(steps: list[StepView]) -> list[Repeat]:
+    """Runs of back-to-back steps with the same agent, operation, tools, and arguments."""
     repeats: list[Repeat] = []
     index = 0
     while index < len(steps):
