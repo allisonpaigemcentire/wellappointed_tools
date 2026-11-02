@@ -245,3 +245,401 @@ def test_prefix_pattern_matches_known_shapes():
     for sample in samples:
         assert pattern.search(sample), sample
     assert pattern.search("local-only-static-string-0123456789") is None
+
+
+# Regression cases from the 2026-11-02 review.
+
+
+def test_max_tokens_is_not_an_iteration_cap(tmp_path: Path):
+    findings = _source(
+        tmp_path,
+        "MAX_TOKENS = 512\n"
+        "def run(client, prompt):\n"
+        "    max_tokens = MAX_TOKENS\n"
+        "    while True:\n"
+        "        resp = client.chat.completions.create(model='m', messages=[], max_tokens=max_tokens, timeout=5)\n"
+        "        if resp.done:\n"
+        "            return resp\n",
+    )
+    assert _ids(findings) == {"AGT003"}
+    for knob in ("max_output_tokens", "max_completion_tokens", "max_new_tokens"):
+        source = (
+            "def run(client):\n"
+            "    while True:\n"
+            f"        client.responses.create(model='m', {knob}=64, timeout=5)\n"
+        )
+        assert _ids(_source(tmp_path, source)) == {"AGT003"}, knob
+
+
+def test_cap_name_compared_and_exited_counts(tmp_path: Path):
+    findings = _source(
+        tmp_path,
+        "MAX_TURNS = 8\n"
+        "def run(client):\n"
+        "    turn = 0\n"
+        "    while True:\n"
+        "        turn += 1\n"
+        "        client.chat.completions.create(model='m', messages=[], max_tokens=64, timeout=5)\n"
+        "        if turn >= MAX_TURNS:\n"
+        "            raise RuntimeError('turn budget spent')\n",
+    )
+    assert findings == []
+
+
+def test_cap_name_outside_a_compare_does_not_count(tmp_path: Path):
+    findings = _source(
+        tmp_path,
+        "def run(client, max_turns=3):\n"
+        "    while True:\n"
+        "        client.chat.completions.create(model='m', messages=[], timeout=5)\n"
+        "        log(max_turns)\n",
+    )
+    assert _ids(findings) == {"AGT003"}
+
+
+def test_current_openai_key_shapes_are_secrets(tmp_path: Path):
+    pattern = lint._secret_prefix()
+    for prefix in ("proj", "svcacct", "admin"):
+        sample = "sk" + "-" + prefix + "-" + ("Ab3_" * 6)
+        assert pattern.search(sample), prefix
+    live = "sk" + "-" + "proj" + "-" + ("abcdefgh1234" * 2)
+    findings = _source(tmp_path, f"import os\nAPI_KEY = os.environ.get('API_KEY', '{live}')\n")
+    assert _ids(findings) == {"AGT008"}
+
+
+def test_requests_session_constructor_needs_no_timeout(tmp_path: Path):
+    findings = _source(
+        tmp_path,
+        "import requests\n"
+        "session = requests.Session()\n"
+        "def fetch(url):\n"
+        "    return session.get(url, timeout=5)\n",
+    )
+    assert findings == []
+    still_flagged = _source(tmp_path, "import httpx\nclient = httpx.Client()\n")
+    assert _ids(still_flagged) == {"AGT006"}
+
+
+def test_self_attribute_client_needs_a_timeout(tmp_path: Path):
+    findings = _source(
+        tmp_path,
+        "import requests\n"
+        "class Agent:\n"
+        "    def __init__(self):\n"
+        "        self.http = requests.Session()\n"
+        "    def lookup(self, sku):\n"
+        "        return self.http.get(f'https://example.invalid/{sku}')\n",
+    )
+    assert [(item.rule_id, item.line) for item in findings] == [("AGT006", 6)]
+    assert "self.http.get" in findings[0].message
+
+
+def test_client_built_with_timeout_covers_its_calls(tmp_path: Path):
+    findings = _source(
+        tmp_path,
+        "from openai import OpenAI\n"
+        "client = OpenAI(timeout=30)\n"
+        "class Agent:\n"
+        "    def __init__(self):\n"
+        "        self.llm = OpenAI(timeout=30)\n"
+        "    def ask(self):\n"
+        "        return self.llm.chat.completions.create(model='m', messages=[])\n"
+        "def ask():\n"
+        "    return client.chat.completions.create(model='m', messages=[])\n",
+    )
+    assert findings == []
+
+
+def test_broad_except_returning_empty_is_flagged(tmp_path: Path):
+    for body in ("return []", "return None", "return", "return {}", "return ''", "continue"):
+        source = (
+            "def fetch(items):\n"
+            "    for item in items:\n"
+            "        try:\n"
+            "            return load(item)\n"
+            "        except Exception:\n"
+            f"            {body}\n"
+        )
+        findings = _source(tmp_path, source)
+        assert _ids(findings) == {"AGT001"}, body
+        assert "empty result" in findings[0].message
+    tuple_form = _source(
+        tmp_path,
+        "def fetch():\n"
+        "    try:\n"
+        "        return load()\n"
+        "    except (ValueError, BaseException):\n"
+        "        return []\n",
+    )
+    assert _ids(tuple_form) == {"AGT001"}
+
+
+def test_logged_or_narrow_empty_return_is_quiet(tmp_path: Path):
+    findings = _source(
+        tmp_path,
+        "def fetch():\n"
+        "    try:\n"
+        "        return load()\n"
+        "    except Exception:\n"
+        "        log.exception('load failed')\n"
+        "        return []\n"
+        "\n"
+        "def lookup(table, key):\n"
+        "    try:\n"
+        "        return table[key]\n"
+        "    except KeyError:\n"
+        "        return None\n"
+        "\n"
+        "def parse(blob):\n"
+        "    try:\n"
+        "        return decode(blob)\n"
+        "    except Exception:\n"
+        "        return fallback(blob)\n",
+    )
+    assert findings == []
+
+
+def test_log_preview_slice_is_not_truncation(tmp_path: Path):
+    findings = _source(
+        tmp_path,
+        "import logging, sys\n"
+        "logger = logging.getLogger(__name__)\n"
+        "def preview(text, prompt):\n"
+        "    print(text[:80])\n"
+        "    logger.info('prompt %s', prompt[:120])\n"
+        "    sys.stderr.write(f'{text[:40]}\\n')\n"
+        "    self_log = None\n",
+    )
+    assert findings == []
+    still_flagged = _source(tmp_path, "def call(llm, prompt):\n    return llm(prompt[:400])\n")
+    assert _ids(still_flagged) == {"AGT005"}
+
+
+def test_tool_substring_and_stdout_are_not_write_tools(tmp_path: Path):
+    findings = _source(
+        tmp_path,
+        "import sys\n"
+        "def render_toolbar(items):\n"
+        "    sys.stdout.write(','.join(items))\n"
+        "\n"
+        "@toolbar.register\n"
+        "def draw(items):\n"
+        "    items.remove(None)\n",
+    )
+    assert findings == []
+    still_flagged = _source(
+        tmp_path,
+        "def delete_tool(path):\n"
+        "    path.unlink()\n"
+        "\n"
+        "@mcp.tool()\n"
+        "def wipe(path):\n"
+        "    path.unlink()\n",
+    )
+    assert [item.rule_id for item in still_flagged] == ["AGT007", "AGT007"]
+
+
+def test_event_loop_with_except_continue_is_not_a_retry(tmp_path: Path):
+    findings = _source(
+        tmp_path,
+        "def poll_events(queue, max_events=100):\n"
+        "    while True:\n"
+        "        try:\n"
+        "            item = queue.get()\n"
+        "        except KeyError:\n"
+        "            continue\n"
+        "        handle(item)\n",
+    )
+    assert findings == []
+    retry = _source(
+        tmp_path,
+        "def pull(session):\n"
+        "    while True:\n"
+        "        try:\n"
+        "            return session.get('https://example.invalid', timeout=5)\n"
+        "        except ConnectionError:\n"
+        "            continue\n",
+    )
+    assert _ids(retry) == {"AGT004"}
+
+
+def test_review_sample_agent_findings():
+    findings = lint_path(FIXTURES / "review_agent.py")
+    got = sorted((item.line, item.rule_id) for item in findings)
+    assert got == [(12, "AGT003"), (21, "AGT001"), (30, "AGT006"), (56, "AGT008")]
+
+
+def test_positional_only_defaults_do_not_crash_the_secret_rule(tmp_path: Path):
+    key = "sk-" + "proj-" + "abcdefghijklmnopqrstuvwx"
+    findings = _source(
+        tmp_path,
+        f'def f(api_key="{key}", /, b=2):\n'
+        "    return api_key\n"
+        "\n"
+        "def g(x, y=1, /, *, z, w=3):\n"
+        "    return x\n",
+    )
+    assert [(item.rule_id, item.line) for item in findings] == [("AGT008", 1)]
+
+
+def test_words_that_contain_sk_dash_are_not_keys(tmp_path: Path):
+    findings = _source(
+        tmp_path,
+        'SLUG = "desk-lamp-checkout-flow-v2"\n'
+        'TITLE = "risk-assessment-quarterly"\n'
+        'NAME = "task-ant-colony-simulation"\n',
+    )
+    assert "AGT008" not in _ids(findings)
+
+
+def test_a_break_in_an_inner_loop_does_not_cap_the_outer_loop(tmp_path: Path):
+    findings = _source(
+        tmp_path,
+        "def run(client, messages):\n"
+        "    while True:\n"
+        "        client.chat.completions.create(model='m', messages=messages, timeout=5)\n"
+        "        for i in range(10):\n"
+        "            if i > 5:\n"
+        "                break\n",
+    )
+    assert "AGT003" in _ids(findings)
+
+
+def test_a_return_in_an_inner_loop_still_caps_the_outer_loop(tmp_path: Path):
+    findings = _source(
+        tmp_path,
+        "def run(client, messages):\n"
+        "    turn = 0\n"
+        "    while True:\n"
+        "        turn += 1\n"
+        "        client.chat.completions.create(model='m', messages=messages, timeout=5)\n"
+        "        for _ in range(1):\n"
+        "            if turn > 10:\n"
+        "                return None\n",
+    )
+    assert "AGT003" not in _ids(findings)
+
+
+def test_broad_except_returning_false_from_a_check_is_quiet(tmp_path: Path):
+    findings = _source(
+        tmp_path,
+        "def is_number(text):\n"
+        "    try:\n"
+        "        int(text)\n"
+        "        return True\n"
+        "    except Exception:\n"
+        "        return False\n",
+    )
+    assert "AGT001" not in _ids(findings)
+
+
+def test_tool_registry_decorator_and_camel_case_tool_names_are_tools(tmp_path: Path):
+    findings = _source(
+        tmp_path,
+        "@tool_registry.register\n"
+        "def save_report(path):\n"
+        "    open(path, 'w').write('x')\n"
+        "\n"
+        "def sendEmailTool(to):\n"
+        "    smtp.send(to)\n"
+        "\n"
+        "def renderToolbar(items):\n"
+        "    sys.stdout.write(str(items))\n",
+    )
+    assert sorted(item.line for item in findings if item.rule_id == "AGT007") == [2, 5]
+
+
+def test_client_built_with_timeout_none_does_not_cover_its_calls(tmp_path: Path):
+    findings = _source(
+        tmp_path,
+        "import httpx\n"
+        "http = httpx.Client(timeout=None)\n"
+        "def fetch(url):\n"
+        "    return http.get(url)\n",
+    )
+    assert [(item.rule_id, item.line) for item in findings] == [("AGT006", 4)]
+
+
+def test_lower_camel_case_tool_name_is_a_tool(tmp_path: Path):
+    findings = _source(
+        tmp_path,
+        "def toolSendEmail(to):\n"
+        "    smtp.send(to)\n"
+        "\n"
+        "def toolbar_send(items):\n"
+        "    smtp.send(items)\n",
+    )
+    assert [item.line for item in findings if item.rule_id == "AGT007"] == [1]
+
+
+# Regression cases from the 2026-11-02 Debugging Bot review.
+
+
+def test_budget_method_that_exits_caps_the_loop(tmp_path: Path):
+    findings = _source(
+        tmp_path,
+        "def run(client, budget):\n"
+        "    while True:\n"
+        "        client.chat.completions.create(model='m', messages=[], timeout=5)\n"
+        "        if budget.exhausted():\n"
+        "            break\n",
+    )
+    assert "AGT003" not in _ids(findings)
+
+
+def test_break_in_else_caps_the_loop(tmp_path: Path):
+    findings = _source(
+        tmp_path,
+        "def run(client, max_turns=3):\n"
+        "    turn = 0\n"
+        "    while True:\n"
+        "        client.chat.completions.create(model='m', messages=[], timeout=5)\n"
+        "        if turn < max_turns:\n"
+        "            turn += 1\n"
+        "            continue\n"
+        "        else:\n"
+        "            break\n",
+    )
+    assert "AGT003" not in _ids(findings)
+
+
+def test_elif_exit_does_not_cap_through_the_first_test(tmp_path: Path):
+    findings = _source(
+        tmp_path,
+        "def run(client, max_turns=3, done=False):\n"
+        "    turn = 0\n"
+        "    while True:\n"
+        "        client.chat.completions.create(model='m', messages=[], timeout=5)\n"
+        "        if turn < max_turns:\n"
+        "            turn += 1\n"
+        "        elif done:\n"
+        "            break\n",
+    )
+    assert "AGT003" in _ids(findings)
+
+
+def test_config_key_and_camel_case_caps_count(tmp_path: Path):
+    for test in ('turn >= config["max_turns"]', "turn >= maxTurns"):
+        findings = _source(
+            tmp_path,
+            "def run(client, config, maxTurns=3):\n"
+            "    turn = 0\n"
+            "    while True:\n"
+            "        turn += 1\n"
+            "        client.chat.completions.create(model='m', messages=[], timeout=5)\n"
+            f"        if {test}:\n"
+            "            break\n",
+        )
+        assert "AGT003" not in _ids(findings), test
+
+
+def test_camel_case_token_limit_is_not_an_iteration_cap(tmp_path: Path):
+    findings = _source(
+        tmp_path,
+        "def run(client, maxOutputTokens=64):\n"
+        "    while True:\n"
+        "        client.chat.completions.create(model='m', messages=[], timeout=5)\n"
+        "        if maxOutputTokens:\n"
+        "            break\n",
+    )
+    assert "AGT003" in _ids(findings)

@@ -25,3 +25,7 @@ agentdebug = ["templates/*.md"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["src"]
+
+[tool.ruff]
+# The fixtures are deliberate smells: undefined names and bare excepts.
+extend-exclude = ["tests/fixtures"]
