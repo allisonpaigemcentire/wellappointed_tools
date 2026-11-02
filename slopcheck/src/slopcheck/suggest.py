@@ -37,6 +37,7 @@ def known_terms(entries: list[dict]) -> set[str]:
 
 
 def zipf_frequency(word: str) -> float:
+    """How common a word is in English, on the Zipf scale. Needs the optional wordfreq package."""
     try:
         from wordfreq import zipf_frequency as freq
     except ImportError as exc:
