@@ -430,7 +430,9 @@ patterns:
 - id: dont-just-we
   category: contrast-frame
   severity: error
-  pattern: \b(?:we|it|they|you|i) (?:do|does|did)(?:n['’]t| not) (?:just|only|merely|simply) [^.;!?—–]{1,60}?(?:[.;!]|\s*—|\s*–|\s*--)\s*(?:we|it|they|you|i)\b
+  # A comma joins the two halves as often as a full stop. "It doesn't only X. It also Y."
+  # adds a claim instead of trading one away, so a following also, too, or even is left alone.
+  pattern: \b(?:we|it|they|you|i) (?:do|does|did)(?:n['’]t| not) (?:just|only|merely|simply) [^.;!?—–]{1,60}?(?:[.;!,]|\s*—|\s*–|\s*--)\s*(?:we|it|they|you|i)\b(?!\s+(?:also|too|even|still)\b)
   suggestion: Say what you do. Drop the smaller claim it is set against.
 - id: reveal-question
   category: reveal-fragment

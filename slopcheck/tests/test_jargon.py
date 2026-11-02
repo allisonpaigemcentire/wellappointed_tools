@@ -240,6 +240,7 @@ def test_gemini_context_file_is_listed():
     "The CLI scaffolds the report.",
     "We scaffold the project first.",
     "Use it to scaffold a new repo.",
+    "You can scaffold it in a minute.",
 ])
 def test_scaffold_as_a_verb_is_quiet(line):
     assert _terms(line + "\n") == [], line
@@ -247,3 +248,7 @@ def test_scaffold_as_a_verb_is_quiet(line):
 
 def test_scaffold_as_a_noun_still_flags():
     assert any(item[0] == "harness / scaffold" for item in _terms("The agent scaffold failed.\n"))
+
+
+def test_scaffold_plural_noun_still_flags():
+    assert any(item[0] == "harness / scaffold" for item in _terms("Scaffolds vary between vendors.\n"))

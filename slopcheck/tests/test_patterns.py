@@ -250,3 +250,19 @@ def test_different_categories_on_one_span_both_report():
     inner_other = make("c", "filler", 3, 10)
     kept = drop_nested_findings([outer, inner_same, inner_other], {"a", "b", "c"})
     assert kept == [outer, inner_other]
+
+
+@pytest.mark.parametrize("line", [
+    "We don't just ship code, we ship outcomes.",
+    "It doesn't just run, it reports.",
+])
+def test_contrast_frame_flags_a_comma_join(line):
+    assert hits(line + "\n", "contrast-frame"), line
+
+
+@pytest.mark.parametrize("line", [
+    "It doesn't only fail on Windows. It also fails on macOS.",
+    "They don't only test it; they even fuzz it.",
+])
+def test_not_only_also_adds_a_claim_and_is_not_a_contrast_frame(line):
+    assert hits(line + "\n", "contrast-frame") == [], line

@@ -269,8 +269,8 @@ entries:
   - scaffolding
   - agent scaffolding
   regex:
-  # The noun only. "scaffolds the report" and "to scaffold a project" use the verb.
-  - (?<!\bto )\bscaffold\b(?!s?\s+(?:the|a|an|this|that|these|those|your|our|their|its|my|new|out|up)\b)
+  # The noun, singular or plural. "scaffolds the report", "scaffold it", and "to scaffold a project" use the verb.
+  - (?<!\bto )\bscaffolds?\b(?!\s+(?:the|a|an|this|that|these|those|your|our|their|its|my|new|out|up|it|them)\b)
   meaning: 'The software wrapped around a model that turns it into an agent: the loop, the tools, and
     the prompts that a vendor, an open-source project, or a benchmark supplies. It is not the team''s
     repo, tests, or checks.'
