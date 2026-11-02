@@ -10,8 +10,12 @@ REPO = PACKAGE.parent
 DIST = "wellappointed-slopcheck"
 GIT_INSTALL = "git+https://github.com/allisonpaigemcentire/wellappointed_tools#subdirectory=slopcheck"
 
-# `pip install slopcheck` or `pip install "slopcheck[suggest]"` with no git or path source.
-BARE_PYPI = re.compile(r"""pip install\s+["']?slopcheck(?:\[[a-z,]+\])?["']?(?=\s|$|`)(?!\s*@)""")
+# `pip install slopcheck`, `pip install "slopcheck[suggest]"`, `pip install -U slopcheck==0.2`,
+# `pipx install slopcheck`, or `uv tool install slopcheck`, with no git or path source.
+BARE_PYPI = re.compile(
+    r"""(?:pipx|pip3?|uv pip|uv tool|python3? -m pip) install(?:\s+-{1,2}[\w-]+)*\s+"""
+    r"""["']?slopcheck(?:\[[a-z,]+\])?(?:[=<>~!]=?[\w.*]+)?["']?(?=\s|$|`)(?!\s*@)"""
+)
 
 
 def _install_texts():
@@ -67,6 +71,11 @@ def test_bare_pypi_pattern_catches_the_old_wording():
     assert not _bare_installs(f'pip install "slopcheck @ {GIT_INSTALL}"')
     assert not _bare_installs(f'pip install "{DIST} @ {GIT_INSTALL}"')
     assert not _bare_installs("pip install wellappointed-slopcheck")
+    assert _bare_installs("pipx install slopcheck")
+    assert _bare_installs("uv tool install slopcheck")
+    assert _bare_installs("pip install -U slopcheck")
+    assert _bare_installs("python -m pip install slopcheck==0.2.0")
+    assert not _bare_installs("pipx install ./slopcheck")
 
 
 def test_distribution_is_renamed_but_module_and_command_are_not():
