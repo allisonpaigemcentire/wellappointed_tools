@@ -79,7 +79,7 @@ The term suggester is optional:
 pip install "wellappointed-slopcheck[suggest] @ git+https://github.com/allisonpaigemcentire/wellappointed_tools#subdirectory=slopcheck"
 ```
 
-From a clone of the repository root, `pip install ./slopcheck` does the same. If you installed an earlier copy from this repository under the old package name, run `pip uninstall slopcheck` first, so two packages do not claim the same files.
+From a clone of the repository root, `pip install ./slopcheck` does the same. If you installed an earlier copy from this repository under the old package name, run `pip uninstall slopcheck` first, so two packages do not claim the same files. This also removes the unrelated PyPI package of that name, if you have it.
 
 From a checkout of this directory (`slopcheck/` in [wellappointed_tools](https://github.com/allisonpaigemcentire/wellappointed_tools)):
 

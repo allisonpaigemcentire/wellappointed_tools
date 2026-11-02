@@ -94,3 +94,18 @@ def test_git_installs_use_the_new_package_name():
         if hits:
             offenders[str(path.relative_to(REPO))] = hits
     assert offenders == {}
+
+
+def test_no_doc_tells_you_to_install_agentdebug_from_pypi():
+    # agentdebug is unclaimed on PyPI, so anyone could publish under that name later.
+    bare = re.compile(BARE_PYPI.pattern.replace("slopcheck", "agentdebug"))
+    paths = [REPO / "README.md", REPO / "agentdebug" / "README.md"]
+    offenders = {
+        str(path.relative_to(REPO)): hits
+        for path in paths
+        if path.is_file()
+        and (hits := [line.strip() for line in path.read_text(encoding="utf-8").splitlines() if bare.search(line)])
+    }
+    assert offenders == {}
+    assert not bare.search('pip install "agentdebug @ git+https://example.invalid#subdirectory=agentdebug"')
+    assert bare.search("pip install agentdebug")
