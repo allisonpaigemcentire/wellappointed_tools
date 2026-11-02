@@ -239,6 +239,7 @@ def title_span(line: str) -> tuple[str, int] | None:
 
 
 def _blank(line: str, start: int, end: int) -> str:
+    """Replace line[start:end] with spaces, keeping the column of everything after it."""
     return line[:start] + " " * (end - start) + line[end:]
 
 
@@ -271,6 +272,7 @@ def mask_comment_lines(line: str, in_comment: bool) -> tuple[str, bool]:
 
 
 def classify_lines(text: str, scan: ScanConfig | None = None) -> list[LineInfo]:
+    """Label each line as front, title, body, code, or skip. Lines inside a multi-line HTML comment are skipped or blanked."""
     scan = scan or default_scan_config()
     lines = normalize(text).split("\n")
     front_end = None

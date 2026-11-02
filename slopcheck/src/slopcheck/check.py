@@ -129,6 +129,7 @@ def pattern_findings(
     scan: ScanConfig | None = None,
     names: set[str] | None = None,
 ) -> list[Finding]:
+    """Run the regex patterns over body lines and title fields. Other front-matter lines are not prose and are skipped."""
     findings: list[Finding] = []
     known = names or set()
     for index, line in enumerate(lines):
@@ -181,6 +182,7 @@ def emdash_findings(
     rules: RuleSet,
     scan: ScanConfig | None = None,
 ) -> list[Finding]:
+    """Warn when a window of words holds more em dashes than the limit. Dash counts per window come from a binary search."""
     rule = rules.em_dash
     if not rule.enabled:
         return []
@@ -442,12 +444,14 @@ _LEVEL = {"warning": 1, "error": 2}
 
 
 def _span(item: Finding) -> tuple[int, int] | None:
+    """Start and end column of a one-line finding, or None when it spans lines."""
     if item.line != item.end_line:
         return None
     return item.column, item.end_column
 
 
 def _inside(inner: tuple[int, int], outer: tuple[int, int]) -> bool:
+    """True when the inner span sits within the outer span."""
     return outer[0] <= inner[0] and inner[1] <= outer[1]
 
 

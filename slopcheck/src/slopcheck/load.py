@@ -237,6 +237,7 @@ def load_rules(path: Path | None = None) -> RuleSet:
 
 
 def merge_rules(base: RuleSet, text: str, path: str, extra_disable: list[str] | None = None) -> RuleSet:
+    """Merge a user rules file over the base rules. Disabled ids are matched without case."""
     patterns, em_dash, replace, disable = parse_rules(text, path)
     # The user's em_dash block was parsed against defaults. Re-apply it on top of base.
     try:
