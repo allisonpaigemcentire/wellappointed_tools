@@ -74,7 +74,8 @@ class TraceSummary:
 def summarize_path(path: Path) -> TraceSummary:
     if not path.is_file():
         raise FileNotFoundError(path)
-    text = path.read_text(encoding="utf-8")
+    # utf-8-sig drops a byte order mark that some editors and Windows tools write.
+    text = path.read_text(encoding="utf-8-sig")
     return summarize_text(text)
 
 
@@ -548,11 +549,13 @@ def _claude_code_steps(records: list[dict[str, Any]]) -> list[StepView]:
 
     Each user or assistant line is a step. tool_use blocks become tool calls with their
     input as arguments. A tool_result with is_error true is reported as `tool: message`
-    on the step that carries the result.
+    on the step that carries the result. Consecutive user lines of the same kind (parallel
+    tool results, or a command caveat before the prompt) are one step, not a repeat.
     """
     tool_names: dict[str, str] = {}
     steps: list[StepView] = []
     last_message_id: str | None = None
+    last_user: tuple[str, str] | None = None
     for record in records:
         if record.get("type") not in _CLAUDE_TURN_TYPES:
             last_message_id = None
@@ -588,6 +591,12 @@ def _claude_code_steps(records: list[dict[str, Any]]) -> list[StepView]:
         raw_usage = message.get("usage")
         usage: dict[str, Any] = raw_usage if isinstance(raw_usage, dict) else {}
         operation = "tool_result" if results and role == "user" else role
+        if role == "user" and last_user == (agent, operation) and steps and not tools:
+            # Parallel tool calls come back as one user line per tool_result, and Claude Code
+            # writes meta lines (caveats, slash-command echoes) before a prompt. Fold them.
+            steps[-1].error = steps[-1].error or error
+            continue
+        last_user = (agent, operation) if role == "user" else None
         message_id = message.get("id") if role == "assistant" and isinstance(message.get("id"), str) else None
         if message_id and message_id == last_message_id and steps:
             # Claude Code writes one line per content block of a single response, each

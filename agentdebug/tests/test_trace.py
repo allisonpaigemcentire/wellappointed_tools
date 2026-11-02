@@ -310,3 +310,57 @@ def test_single_agent_trace_with_only_token_counts_is_recognized():
     summary = summarize_text("\n".join(lines))
     assert summary.input_tokens == 22
     assert summary.output_tokens == 12
+
+
+# Regression cases from the 2026-11-02 Debugging Bot review.
+
+
+def _tool_result(tool_id, text, is_error=False):
+    return _claude(
+        "user",
+        {"role": "user", "content": [{"type": "tool_result", "tool_use_id": tool_id, "content": text, "is_error": is_error}]},
+    )
+
+
+def test_parallel_tool_results_are_one_step_not_a_repeat():
+    lines = [
+        _claude("user", {"role": "user", "content": "check both files"}),
+        _claude(
+            "assistant",
+            {
+                "id": "m1",
+                "role": "assistant",
+                "content": [
+                    {"type": "tool_use", "id": "t1", "name": "Read", "input": {"file_path": "a.py"}},
+                    {"type": "tool_use", "id": "t2", "name": "Read", "input": {"file_path": "b.py"}},
+                ],
+                "usage": {"input_tokens": 10, "output_tokens": 2},
+            },
+        ),
+        _tool_result("t1", "ok"),
+        _tool_result("t2", "No such file", is_error=True),
+    ]
+    summary = summarize_text("\n".join(lines))
+    assert [step.operation for step in summary.steps] == ["user", "assistant", "tool_result"]
+    assert summary.repeats == []
+    assert summary.first_error_step == 3
+    assert summary.steps[2].error == "Read: No such file"
+
+
+def test_meta_user_lines_before_a_prompt_are_one_step():
+    lines = [
+        _claude("user", {"role": "user", "content": "<local-command-caveat>Caveat</local-command-caveat>"}, isMeta=True),
+        _claude("user", {"role": "user", "content": "<command-name>/clear</command-name>"}),
+        _claude("user", {"role": "user", "content": "<local-command-stdout></local-command-stdout>"}),
+        _claude("user", {"role": "user", "content": "fix the test"}),
+        _claude("assistant", {"id": "m1", "role": "assistant", "content": [{"type": "text", "text": "ok"}], "usage": {}}),
+    ]
+    summary = summarize_text("\n".join(lines))
+    assert [step.operation for step in summary.steps] == ["user", "assistant"]
+    assert summary.repeats == []
+
+
+def test_trace_file_with_byte_order_mark(tmp_path: Path):
+    path = tmp_path / "trace.jsonl"
+    path.write_text(json.dumps({"agent": "a", "operation": "chat", "input_tokens": 3}) + "\n", encoding="utf-8-sig")
+    assert summarize_path(path).steps[0].input_tokens == 3
