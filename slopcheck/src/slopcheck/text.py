@@ -199,7 +199,7 @@ def suppressed(keys: set[str], *, rule_id: str, category: str, bucket: str | Non
         return True
     if rule_id.lower() in keys or category.lower() in keys:
         return True
-    return bool(bucket) and (bucket.lower() in keys or "jargon" in keys)
+    return bool(bucket and (bucket.lower() in keys or "jargon" in keys))
 
 
 @dataclass
