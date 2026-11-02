@@ -67,19 +67,19 @@ The buckets follow a practical test. If readers will meet the term in a tool or 
 
 Python 3.11 or newer.
 
-slopcheck is not on PyPI. The name `slopcheck` on PyPI belongs to a different project, so `pip install slopcheck` installs someone else's code and a different `slopcheck` command. Install from this repository instead:
+The package is named `wellappointed-slopcheck`. The command you run and the module you import are still `slopcheck`. The name `slopcheck` on PyPI belongs to a different project, so `pip install slopcheck` installs someone else's code and a different `slopcheck` command. `wellappointed-slopcheck` is not on PyPI yet. Install from this repository instead:
 
 ```bash
-pip install "slopcheck @ git+https://github.com/allisonpaigemcentire/wellappointed_tools#subdirectory=slopcheck"
+pip install "wellappointed-slopcheck @ git+https://github.com/allisonpaigemcentire/wellappointed_tools#subdirectory=slopcheck"
 ```
 
 The term suggester is optional:
 
 ```bash
-pip install "slopcheck[suggest] @ git+https://github.com/allisonpaigemcentire/wellappointed_tools#subdirectory=slopcheck"
+pip install "wellappointed-slopcheck[suggest] @ git+https://github.com/allisonpaigemcentire/wellappointed_tools#subdirectory=slopcheck"
 ```
 
-From a clone of the repository root, `pip install ./slopcheck` does the same.
+From a clone of the repository root, `pip install ./slopcheck` does the same. If you installed an earlier copy from this repository under the old package name, run `pip uninstall slopcheck` first, so two packages do not claim the same files.
 
 From a checkout of this directory (`slopcheck/` in [wellappointed_tools](https://github.com/allisonpaigemcentire/wellappointed_tools)):
 

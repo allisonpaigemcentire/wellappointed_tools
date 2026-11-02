@@ -2,7 +2,7 @@
 
 Shared developer tools. Clone the repository and use the project you need. Each project is a top-level directory with its own install notes.
 
-Neither tool is published on PyPI. The `slopcheck` name on PyPI belongs to a different project, so install from this repository, not with `pip install slopcheck`.
+Neither tool is published on PyPI yet. The `slopcheck` name on PyPI belongs to a different project, so slopcheck's package is named `wellappointed-slopcheck`. Install it from this repository, not with `pip install slopcheck`. The command and the import name are still `slopcheck`.
 
 ## agentdebug
 

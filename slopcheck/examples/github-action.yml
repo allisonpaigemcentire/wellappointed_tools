@@ -1,8 +1,9 @@
 # Sample check for a repository that has this package at ./slopcheck,
 # as in https://github.com/allisonpaigemcentire/wellappointed_tools .
 # Do not use `pip install slopcheck`. That PyPI name is a different project.
+# This package is named wellappointed-slopcheck. The command is still slopcheck.
 # Outside this repository, install from git:
-#   pip install "slopcheck @ git+https://github.com/allisonpaigemcentire/wellappointed_tools#subdirectory=slopcheck"
+#   pip install "wellappointed-slopcheck @ git+https://github.com/allisonpaigemcentire/wellappointed_tools#subdirectory=slopcheck"
 name: prose
 
 on:

@@ -1,5 +1,5 @@
 [project]
-name = "slopcheck"
+name = "wellappointed-slopcheck"
 version = "0.2.0"
 description = "Flag AI-writing patterns and AI jargon, and suggest a plain-language fix."
 readme = "README.md"
