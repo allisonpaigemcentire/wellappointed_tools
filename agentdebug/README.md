@@ -1,6 +1,6 @@
 # agentdebug
 
-A dependency-light toolkit for finding bugs in agentic and multi-agent systems. The method is in [PLAYBOOK.md](PLAYBOOK.md). A review you can follow on your own repository is in [WORKFLOW.md](WORKFLOW.md). The CLI scaffolds the report, scans Python for a few recurring smells, and summarizes a trace. It does not decide root cause. Read the trace.
+A dependency-light toolkit for finding bugs in agentic and multi-agent systems. The method is in [PLAYBOOK.md](PLAYBOOK.md). A review you can follow on your own repository is in [WORKFLOW.md](WORKFLOW.md). The CLI scaffolds the report, scans Python for a few recurring smells, and summarizes a trace. `lint` reads Python files only. It does not scan TypeScript, `AGENTS.md`, rules, skills, hooks, or `mcp.json`. It does not decide root cause. Read the trace.
 
 The runtime code uses the Python standard library. Tests use pytest.
 
@@ -39,18 +39,18 @@ agentdebug lint path/to/one_file.py --format json
 
 The text report is `file:line`, a rule id, a message, and a hint. JSON is a list of objects with `path`, `line`, `rule_id`, `message`, and `hint`. The process exits `1` when there is at least one finding, and `0` when there are none.
 
-These are smells, not proofs. A capped loop whose limit lives in a config file this scanner does not see will be flagged if the cap is not visible in the `while` body.
+These are smells, not proofs. A capped loop whose limit lives in a config file this scanner does not see will be flagged if the cap is not visible in the `while` body. A cap counts only when it is compared in the `while` test, or in an `if` that compares a counter or a `max_*` name and then breaks, returns, or raises. Output limits such as `max_tokens` bound one response, not the number of turns, so they do not count.
 
 | Rule | Smell |
 |---|---|
-| `AGT001` | Bare `except`, or an `except` whose body is only `pass` |
+| `AGT001` | Bare `except`, an `except` whose body is only `pass`, or a broad `except` (bare, `Exception`, `BaseException`) that only returns an empty value or `continue`s, with no log and no raise |
 | `AGT002` | A check or gate that returns `True` on every path, or a result hard-coded as passed with empty findings |
 | `AGT003` | `while True` around a model or tool call with no max-iteration cap |
-| `AGT004` | A retry loop or `@retry` with no stop or attempt limit |
-| `AGT005` | A prefix slice such as `prompt[:N]` or `text[:N]` on a prompt or model input |
-| `AGT006` | An HTTP or model client call with no `timeout` |
-| `AGT007` | A tool that writes or sends and has no approval parameter |
-| `AGT008` | A string literal that looks like a committed secret |
+| `AGT004` | A retry loop (a `try` around a model, tool, or HTTP call inside `while True`) or `@retry` with no stop or attempt limit |
+| `AGT005` | A prefix slice such as `prompt[:N]` or `text[:N]` on a prompt or model input. A slice passed to `print`, a logger, or `sys.stderr.write` is a preview and is skipped |
+| `AGT006` | An HTTP or model client call with no `timeout`, including `self.http.get(...)`. A client built with `timeout=` in the same module covers its calls. `requests.Session()` takes no timeout, so only its requests are checked |
+| `AGT007` | A tool (`tool` as a whole name segment, or a `@tool` decorator) that writes or sends and has no approval parameter. Writes to `sys.stdout` and `sys.stderr` do not count |
+| `AGT008` | A string literal that looks like a committed secret, including `sk-proj-`, `sk-svcacct-`, and `sk-admin-` keys. This is a smell check, not a secret scanner. Use [gitleaks](https://github.com/gitleaks/gitleaks) or [trufflehog](https://github.com/trufflesecurity/trufflehog) for that |
 
 `AGT000` means the file could not be decoded or parsed, so the other rules did not run.
 

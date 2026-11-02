@@ -49,6 +49,8 @@ _COUNTER_NAME = re.compile(
     r"(?i)^(i|n|k|step|steps|turn|turns|attempt|attempts|retry|retries|count|idx|iteration|iterations)$"
 )
 _MAX_NAME = re.compile(r"(?i)(^|_)(max|limit|cap|bound|budget|threshold)($|_)")
+# Model output-size knobs. They bound one response, not the number of turns.
+_TOKEN_LIMIT_NAME = re.compile(r"(?i)(^|_)(max|limit)_?(new_|output_|completion_)?tokens?$")
 _SECRET_NAME = re.compile(
     r"(?i)(?:^|[._])(?:api[_-]?key|secret|password|passwd|credential|private[_-]?key|access[_-]?token|auth[_-]?token|token)(?:$|[._])"
 )
@@ -64,10 +66,17 @@ _LLM_CONTEXT = {"chat", "completions", "messages", "responses", "llm", "model", 
 _DIRECT_LLM = re.compile(r"(?i)^(llm|call_model|run_agent|call_tool|complete|invoke_model)$")
 _HTTP_METHODS = {"get", "post", "put", "patch", "delete", "head", "request"}
 _HTTP_ROOTS = {"requests", "httpx", "session", "client", "http", "api", "http_client"}
-_HTTP_CONSTRUCTORS = {"Client", "AsyncClient", "Session"}
+# requests.Session() takes no timeout argument, so it is not listed here.
+_HTTP_CONSTRUCTORS = {"Client", "AsyncClient"}
+_SELF_NAMES = {"self", "cls"}
+_BROAD_EXCEPTIONS = {"Exception", "BaseException"}
+_LOG_ROOTS = {"log", "logger", "logging", "_log", "_logger", "print", "warnings"}
+_LOG_METHODS = {"debug", "info", "warning", "warn", "error", "exception", "critical", "log"}
+_STD_STREAMS = {"stdout", "stderr"}
 _APPROVAL_NAME = re.compile(r"(?i)(approv|confirm|human_ok|require_approval|authorized)")
 _WRITE_CALLS = {"write", "send", "post", "delete", "publish", "remove", "unlink", "rmtree", "put", "patch"}
-_TOOL_NAME = re.compile(r"(?i)(^tool_|_tool$|tool)")
+# "tool" as a whole name segment: tool_x, x_tool, x_tools_y. Not render_toolbar.
+_TOOL_NAME = re.compile(r"(?i)(^|_)tools?($|_)")
 
 
 @dataclass(frozen=True)
@@ -166,14 +175,17 @@ def _swallowed_exceptions(tree: ast.AST, display: str) -> list[Finding]:
             continue
         bare = node.type is None
         only_pass = _handler_is_pass(node)
-        if not bare and not only_pass:
+        silent_empty = _is_broad_handler(node) and _handler_returns_empty(node)
+        if not bare and not only_pass and not silent_empty:
             continue
         if bare and only_pass:
             message = "bare except whose body is only pass"
         elif bare:
             message = "bare except swallows every failure, including interrupts"
-        else:
+        elif only_pass:
             message = "exception handler body is only pass"
+        else:
+            message = "broad except turns a failure into an empty result"
         findings.append(
             Finding(
                 path=display,
@@ -190,6 +202,40 @@ def _handler_is_pass(node: ast.ExceptHandler) -> bool:
     if not node.body:
         return False
     return all(_is_noop(stmt) for stmt in node.body)
+
+
+def _is_broad_handler(node: ast.ExceptHandler) -> bool:
+    if node.type is None:
+        return True
+    names = node.type.elts if isinstance(node.type, ast.Tuple) else [node.type]
+    return any(_chain(name)[-1:] and _chain(name)[-1] in _BROAD_EXCEPTIONS for name in names)
+
+
+def _handler_returns_empty(node: ast.ExceptHandler) -> bool:
+    """The body is only `return <empty>`, `return None`, or `continue`, with no log and no raise."""
+    if not node.body:
+        return False
+    body = [stmt for stmt in node.body if not _is_noop(stmt)]
+    if len(body) != 1:
+        return False
+    stmt = body[0]
+    if isinstance(stmt, ast.Continue):
+        return True
+    return isinstance(stmt, ast.Return) and _is_empty_value(stmt.value)
+
+
+def _is_empty_value(node: ast.AST | None) -> bool:
+    if node is None:
+        return True
+    if isinstance(node, ast.Constant):
+        return node.value is None or node.value in ("", b"") or node.value is False
+    if isinstance(node, (ast.List, ast.Tuple, ast.Set)):
+        return not node.elts
+    if isinstance(node, ast.Dict):
+        return not node.keys
+    if isinstance(node, ast.Call) and not node.args and not node.keywords:
+        return isinstance(node.func, ast.Name) and node.func.id in {"list", "dict", "set", "tuple", "str"}
+    return False
 
 
 def _is_noop(stmt: ast.stmt) -> bool:
@@ -297,7 +343,7 @@ def _unbounded_loops(tree: ast.AST, display: str) -> list[Finding]:
             continue
         calls = [item for item in ast.walk(node) if isinstance(item, ast.Call)]
         has_agent_call = any(_is_llm_or_tool_call(call) for call in calls)
-        has_retry = any(isinstance(item, ast.ExceptHandler) for item in ast.walk(node))
+        has_retry = any(_try_retries_a_call(item) for item in ast.walk(node) if isinstance(item, ast.Try))
         if has_agent_call:
             findings.append(
                 Finding(
@@ -319,6 +365,29 @@ def _unbounded_loops(tree: ast.AST, display: str) -> list[Finding]:
                 )
             )
     return findings
+
+
+def _try_retries_a_call(node: ast.Try) -> bool:
+    """A try/except is a retry when the try body calls a model, a tool, or an HTTP client.
+
+    An event loop that catches a queue or parse error and moves on is not a retry.
+    """
+    if not node.handlers:
+        return False
+    for stmt in node.body:
+        for item in ast.walk(stmt):
+            if isinstance(item, ast.Call) and (_is_llm_or_tool_call(item) or _is_network_call(item)):
+                return True
+    return False
+
+
+def _is_network_call(node: ast.Call) -> bool:
+    parts = _strip_self(_chain(node.func))
+    if not parts:
+        return False
+    if parts[-1] == "urlopen":
+        return True
+    return parts[-1] in _HTTP_METHODS and _looks_like_http(parts)
 
 
 def _retry_decorators(tree: ast.AST, display: str) -> list[Finding]:
@@ -371,25 +440,52 @@ def _call_expresses_limit(node: ast.Call) -> bool:
 
 
 def _has_iteration_cap(loop: ast.While) -> bool:
+    """A cap is a comparison in the loop test, or an `if` that compares and then leaves the loop.
+
+    A cap-like name anywhere else in the body (for example `max_tokens=` on the model
+    call) does not stop the loop, so it does not count.
+    """
+    if _test_is_counter_cap(loop.test):
+        return True
     for node in ast.walk(loop):
-        if isinstance(node, ast.Name) and _MAX_NAME.search(node.id):
-            return True
-        if isinstance(node, ast.If) and _if_breaks(node) and _test_is_counter_cap(node.test):
+        if node is loop:
+            continue
+        if isinstance(node, ast.If) and _if_exits(node) and _test_is_counter_cap(node.test):
             return True
     return False
 
 
-def _if_breaks(node: ast.If) -> bool:
-    return any(isinstance(item, ast.Break) for item in ast.walk(node))
+def _if_exits(node: ast.If) -> bool:
+    return any(isinstance(item, (ast.Break, ast.Return, ast.Raise)) for stmt in node.body for item in ast.walk(stmt))
+
+
+def _cap_name(name: str) -> bool:
+    return bool(_MAX_NAME.search(name)) and not _TOKEN_LIMIT_NAME.search(name)
+
+
+def _compare_names(test: ast.AST) -> list[str]:
+    names: list[str] = []
+    for item in ast.walk(test):
+        if isinstance(item, ast.Name):
+            names.append(item.id)
+        elif isinstance(item, ast.Attribute):
+            names.append(item.attr)
+    return names
 
 
 def _test_is_counter_cap(test: ast.AST) -> bool:
+    if isinstance(test, ast.BoolOp):
+        return any(_test_is_counter_cap(value) for value in test.values)
     if not isinstance(test, ast.Compare):
         return False
-    names = [item.id for item in ast.walk(test) if isinstance(item, ast.Name)]
-    has_counter = any(_COUNTER_NAME.match(name) or _MAX_NAME.search(name) for name in names)
-    has_int = any(isinstance(item, ast.Constant) and isinstance(item.value, int) for item in ast.walk(test))
-    return has_counter and has_int
+    names = _compare_names(test)
+    has_counter = any(_COUNTER_NAME.match(name) for name in names)
+    has_cap = any(_cap_name(name) for name in names)
+    has_int = any(
+        isinstance(item, ast.Constant) and isinstance(item.value, int) and not isinstance(item.value, bool)
+        for item in ast.walk(test)
+    )
+    return (has_counter or has_cap) and (has_int or has_cap)
 
 
 def _silent_truncation(tree: ast.AST, display: str) -> list[Finding]:
@@ -402,6 +498,8 @@ def _silent_truncation(tree: ast.AST, display: str) -> list[Finding]:
         target = _slice_name(node.value)
         if target is None or target.lower() not in _TRUNCATED_NAMES:
             continue
+        if _inside_log_call(node):
+            continue
         findings.append(
             Finding(
                 path=display,
@@ -412,6 +510,32 @@ def _silent_truncation(tree: ast.AST, display: str) -> list[Finding]:
             )
         )
     return findings
+
+
+def _inside_log_call(node: ast.AST) -> bool:
+    """A slice passed to print, a logger, or a stream write is a preview, not model input."""
+    current = getattr(node, "parent", None)
+    while current is not None and not isinstance(current, ast.stmt):
+        if isinstance(current, ast.Call) and _is_log_call(current):
+            return True
+        current = getattr(current, "parent", None)
+    return False
+
+
+def _is_log_call(node: ast.Call) -> bool:
+    parts = _strip_self(_chain(node.func))
+    if not parts:
+        return False
+    if parts == ["print"]:
+        return True
+    if _is_std_stream_write(parts):
+        return True
+    lower = [part.lower() for part in parts]
+    return len(lower) >= 2 and (lower[0] in _LOG_ROOTS or lower[-2].endswith(("log", "logger"))) and lower[-1] in _LOG_METHODS
+
+
+def _is_std_stream_write(parts: list[str]) -> bool:
+    return len(parts) >= 3 and parts[0] == "sys" and parts[1] in _STD_STREAMS
 
 
 def _is_prefix_slice(node: ast.Slice) -> bool:
@@ -432,12 +556,16 @@ def _slice_name(node: ast.AST) -> str | None:
 
 def _missing_timeouts(tree: ast.AST, display: str) -> list[Finding]:
     findings: list[Finding] = []
+    covered = _clients_with_timeout(tree)
     for node in ast.walk(tree):
         if not isinstance(node, ast.Call):
             continue
         if _has_keyword(node, "timeout"):
             continue
         if not _needs_timeout(node):
+            continue
+        parts = _strip_self(_chain(node.func))
+        if parts and parts[0] in covered:
             continue
         label = ".".join(_chain(node.func)) or "call"
         findings.append(
@@ -452,8 +580,33 @@ def _missing_timeouts(tree: ast.AST, display: str) -> list[Finding]:
     return findings
 
 
+def _clients_with_timeout(tree: ast.AST) -> set[str]:
+    """Names bound in this module to a client built with timeout=, such as `client = OpenAI(timeout=30)`."""
+    covered: set[str] = set()
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Assign):
+            targets, value = node.targets, node.value
+        elif isinstance(node, ast.AnnAssign) and node.value is not None:
+            targets, value = [node.target], node.value
+        else:
+            continue
+        if not isinstance(value, ast.Call) or not _has_keyword(value, "timeout"):
+            continue
+        for target in targets:
+            parts = _strip_self(_chain(target))
+            if len(parts) == 1:
+                covered.add(parts[0])
+    return covered
+
+
+def _strip_self(parts: list[str]) -> list[str]:
+    if len(parts) > 1 and parts[0] in _SELF_NAMES:
+        return parts[1:]
+    return parts
+
+
 def _needs_timeout(node: ast.Call) -> bool:
-    parts = _chain(node.func)
+    parts = _strip_self(_chain(node.func))
     if not parts:
         return False
     last = parts[-1]
@@ -507,8 +660,8 @@ def _is_tool(fn: ast.FunctionDef | ast.AsyncFunctionDef) -> bool:
         return True
     for deco in fn.decorator_list:
         target = deco.func if isinstance(deco, ast.Call) else deco
-        label = ".".join(_chain(target)).lower()
-        if "tool" in label:
+        parts = _chain(target)
+        if parts and _TOOL_NAME.search(parts[-1]):
             return True
     return False
 
@@ -529,13 +682,15 @@ def _writes_or_sends(fn: ast.FunctionDef | ast.AsyncFunctionDef) -> bool:
     for node in ast.walk(fn):
         if isinstance(node, ast.Call):
             parts = _chain(node.func)
+            if parts and _is_std_stream_write(parts):
+                continue
             if parts and parts[-1] in _WRITE_CALLS:
                 return True
             if parts and parts[-1] == "open":
                 mode = _open_mode(node)
                 if mode is not None and any(flag in mode for flag in ("w", "a", "x", "+")):
                     return True
-        if isinstance(node, ast.Attribute) and node.attr in _WRITE_CALLS:
+        if isinstance(node, ast.Attribute) and node.attr in _WRITE_CALLS and not _is_std_stream_write(_chain(node)):
             return True
     return False
 
@@ -586,7 +741,7 @@ def _secrets(tree: ast.AST, display: str) -> list[Finding]:
         defaults = list(node.args.defaults) + list(node.args.kw_defaults)
         args = list(node.args.args)[-len(node.args.defaults) :] if node.args.defaults else []
         args += list(node.args.kwonlyargs)
-        for arg, default in zip(args, defaults):
+        for arg, default in zip(args, defaults, strict=True):
             if default is None or not isinstance(default, ast.Constant) or not isinstance(default.value, str):
                 continue
             if default.lineno in seen:
@@ -631,7 +786,8 @@ def _assigned_secret(value: str) -> bool:
 def _secret_prefix() -> re.Pattern[str]:
     """High-confidence credential shapes. Pieces are split so this file is not itself a secret."""
     parts = [
-        "sk" + r"\-" + r"[A-Za-z0-9]{16,}",
+        # OpenAI keys: legacy sk-..., and the current sk-proj-, sk-svcacct-, and sk-admin- shapes.
+        "sk" + r"\-" + r"(?:proj\-|svcacct\-|admin\-)?" + r"[A-Za-z0-9_\-]{16,}",
         "sk" + r"\-" + "ant" + r"\-",
         "gh" + "p_",
         "gh" + "o_",
@@ -686,7 +842,7 @@ def _has_keyword(node: ast.Call, name: str) -> bool:
 
 def _dict_pairs(node: ast.Dict) -> dict[str, ast.AST]:
     pairs: dict[str, ast.AST] = {}
-    for key, value in zip(node.keys, node.values):
+    for key, value in zip(node.keys, node.values, strict=True):
         if isinstance(key, ast.Constant) and isinstance(key.value, str) and value is not None:
             pairs[key.value] = value
     return pairs
