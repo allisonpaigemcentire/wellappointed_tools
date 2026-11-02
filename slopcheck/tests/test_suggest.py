@@ -45,7 +45,7 @@ def test_cli_suggest_failure_is_exit_2(tmp_path, monkeypatch, capsys):
     path.write_text("Hello from the team.\n", encoding="utf-8")
 
     def boom(*_args, **_kwargs):
-        raise SuggestError('Install it with: pip install "slopcheck[suggest]"')
+        raise SuggestError('The term suggester needs wordfreq. Install it with: pip install "wordfreq>=3.1"')
 
     monkeypatch.setattr("slopcheck.cli.suggest_terms", boom)
     assert main(["--suggest-terms", str(path)]) == 2

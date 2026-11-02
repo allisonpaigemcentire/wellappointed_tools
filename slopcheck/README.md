@@ -67,15 +67,19 @@ The buckets follow a practical test. If readers will meet the term in a tool or 
 
 Python 3.11 or newer.
 
+The package is named `wellappointed-slopcheck`. The command you run and the module you import are still `slopcheck`. The name `slopcheck` on PyPI belongs to a different project, so `pip install slopcheck` installs someone else's code and a different `slopcheck` command. `wellappointed-slopcheck` is not on PyPI yet. Install from this repository instead:
+
 ```bash
-pip install slopcheck
+pip install "wellappointed-slopcheck @ git+https://github.com/allisonpaigemcentire/wellappointed_tools#subdirectory=slopcheck"
 ```
 
 The term suggester is optional:
 
 ```bash
-pip install "slopcheck[suggest]"
+pip install "wellappointed-slopcheck[suggest] @ git+https://github.com/allisonpaigemcentire/wellappointed_tools#subdirectory=slopcheck"
 ```
+
+From a clone of the repository root, `pip install ./slopcheck` does the same. If you installed an earlier copy from this repository under the old package name, run `pip uninstall slopcheck` first, so two packages do not claim the same files. This also removes the unrelated PyPI package of that name, if you have it. If you uninstalled the old package after installing the new one, the `slopcheck` command and module are gone. Reinstall with `pip install --force-reinstall --no-deps "wellappointed-slopcheck @ git+https://github.com/allisonpaigemcentire/wellappointed_tools#subdirectory=slopcheck"`.
 
 From a checkout of this directory (`slopcheck/` in [wellappointed_tools](https://github.com/allisonpaigemcentire/wellappointed_tools)):
 
@@ -295,7 +299,7 @@ repos:
         types_or: [markdown, text, rst]
 ```
 
-`examples/pre-commit-config.yaml` is that sample. A sample workflow that installs `./slopcheck` and checks a docs folder is in `examples/github-action.yml`. The tests for this repository run from `.github/workflows/ci.yml` at the repository root. Until you publish, install from this directory with `pip install .` and call `slopcheck` the same way.
+`examples/pre-commit-config.yaml` is that sample. A sample workflow that installs `./slopcheck` and checks a docs folder is in `examples/github-action.yml`. The tests for this repository run from `.github/workflows/ci.yml` at the repository root. Install from this directory with `pip install .`, or from git as in Install, and call `slopcheck` the same way. Do not use `pip install slopcheck`: that PyPI name is a different project.
 
 ## Before and after
 

@@ -22,6 +22,12 @@ PYTHONPATH=src python3 -m agentdebug --help
 
 The console script `agentdebug` is available after `pip install -e .`.
 
+agentdebug is not on PyPI. To install it outside a checkout, use git:
+
+```bash
+pip install "agentdebug @ git+https://github.com/allisonpaigemcentire/wellappointed_tools#subdirectory=agentdebug"
+```
+
 ## Report scaffold
 
 ```bash
