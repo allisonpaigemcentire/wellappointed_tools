@@ -43,13 +43,13 @@ These are smells, not proofs. A capped loop whose limit lives in a config file t
 
 | Rule | Smell |
 |---|---|
-| `AGT001` | Bare `except`, an `except` whose body is only `pass`, or a broad `except` (bare, `Exception`, `BaseException`) that only returns an empty value or `continue`s, with no log and no raise |
+| `AGT001` | Bare `except`, an `except` whose body is only `pass`, or a broad `except` (bare, `Exception`, `BaseException`) that only returns an empty value (`None`, `[]`, `{}`, `""`) or `continue`s, with no log and no raise. `return False` is left alone, since a check may answer False on error |
 | `AGT002` | A check or gate that returns `True` on every path, or a result hard-coded as passed with empty findings |
 | `AGT003` | `while True` around a model or tool call with no max-iteration cap |
 | `AGT004` | A retry loop (a `try` around a model, tool, or HTTP call inside `while True`) or `@retry` with no stop or attempt limit |
 | `AGT005` | A prefix slice such as `prompt[:N]` or `text[:N]` on a prompt or model input. A slice passed to `print`, a logger, or `sys.stderr.write` is a preview and is skipped |
 | `AGT006` | An HTTP or model client call with no `timeout`, including `self.http.get(...)`. A client built with `timeout=` in the same module covers its calls. `requests.Session()` takes no timeout, so only its requests are checked |
-| `AGT007` | A tool (`tool` as a whole name segment, or a `@tool` decorator) that writes or sends and has no approval parameter. Writes to `sys.stdout` and `sys.stderr` do not count |
+| `AGT007` | A tool (`tool` as a whole name segment, as in `send_tool` or `sendEmailTool`, or a decorator such as `@tool`, `@function_tool`, or `@tool_registry.register`) that writes or sends and has no approval parameter. Writes to `sys.stdout` and `sys.stderr` do not count |
 | `AGT008` | A string literal that looks like a committed secret, including `sk-proj-`, `sk-svcacct-`, and `sk-admin-` keys. This is a smell check, not a secret scanner. Use [gitleaks](https://github.com/gitleaks/gitleaks) or [trufflehog](https://github.com/trufflesecurity/trufflehog) for that |
 
 `AGT000` means the file could not be decoded or parsed, so the other rules did not run.

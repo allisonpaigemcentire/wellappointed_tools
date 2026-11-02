@@ -77,6 +77,8 @@ _APPROVAL_NAME = re.compile(r"(?i)(approv|confirm|human_ok|require_approval|auth
 _WRITE_CALLS = {"write", "send", "post", "delete", "publish", "remove", "unlink", "rmtree", "put", "patch"}
 # "tool" as a whole name segment: tool_x, x_tool, x_tools_y. Not render_toolbar.
 _TOOL_NAME = re.compile(r"(?i)(^|_)tools?($|_)")
+# camelCase or PascalCase: sendEmailTool, ToolRunner, runToolsNow. Not renderToolbar.
+_TOOL_CAMEL = re.compile(r"(?:^|[a-z0-9])Tools?(?:$|[A-Z_])")
 
 
 @dataclass(frozen=True)
@@ -227,11 +229,13 @@ def _handler_returns_empty(node: ast.ExceptHandler) -> bool:
 
 
 def _is_empty_value(node: ast.AST | None) -> bool:
-    """True when a returned value is empty: None, an empty literal, or False."""
+    """True when a returned value is empty: None or an empty literal."""
     if node is None:
         return True
     if isinstance(node, ast.Constant):
-        return node.value is None or node.value in ("", b"") or node.value is False
+        # False is left out: `except Exception: return False` in a validity check is the
+        # check's answer, not an empty result standing in for real data.
+        return node.value is None or node.value in ("", b"")
     if isinstance(node, (ast.List, ast.Tuple, ast.Set)):
         return not node.elts
     if isinstance(node, ast.Dict):
@@ -452,17 +456,42 @@ def _has_iteration_cap(loop: ast.While) -> bool:
     """
     if _test_is_counter_cap(loop.test):
         return True
-    for node in ast.walk(loop):
-        if node is loop:
-            continue
-        if isinstance(node, ast.If) and _if_exits(node) and _test_is_counter_cap(node.test):
+    for node, nested in _loop_body_nodes(loop.body, nested=False):
+        if isinstance(node, ast.If) and _if_exits(node, nested) and _test_is_counter_cap(node.test):
             return True
     return False
 
 
-def _if_exits(node: ast.If) -> bool:
-    """True when the if body breaks, returns, or raises."""
-    return any(isinstance(item, (ast.Break, ast.Return, ast.Raise)) for stmt in node.body for item in ast.walk(stmt))
+_LOOPS = (ast.For, ast.AsyncFor, ast.While)
+_SCOPES = (ast.FunctionDef, ast.AsyncFunctionDef, ast.Lambda, ast.ClassDef)
+
+
+def _loop_body_nodes(body: list[ast.stmt], nested: bool):
+    """Yield (node, nested) for nodes under a loop body.
+
+    `nested` is True once the walk is inside an inner loop, where a `break`
+    leaves the inner loop and not this one. Nested functions and classes are
+    not walked: their code does not run as part of this loop.
+    """
+    stack: list[tuple[ast.AST, bool]] = [(stmt, nested) for stmt in reversed(body)]
+    while stack:
+        node, inner = stack.pop()
+        if isinstance(node, _SCOPES):
+            continue
+        yield node, inner
+        child_inner = inner or isinstance(node, _LOOPS)
+        for child in reversed(list(ast.iter_child_nodes(node))):
+            stack.append((child, child_inner))
+
+
+def _if_exits(node: ast.If, nested: bool = False) -> bool:
+    """True when the if body leaves the loop: return or raise, or a break that is not inside an inner loop."""
+    for item, inner in _loop_body_nodes(node.body, nested):
+        if isinstance(item, (ast.Return, ast.Raise)):
+            return True
+        if isinstance(item, ast.Break) and not inner:
+            return True
+    return False
 
 
 def _cap_name(name: str) -> bool:
@@ -672,14 +701,20 @@ def _ungated_write_tools(tree: ast.AST, display: str) -> list[Finding]:
 
 def _is_tool(fn: ast.FunctionDef | ast.AsyncFunctionDef) -> bool:
     """True when the function is a tool by name or by its decorator."""
-    if _TOOL_NAME.search(fn.name):
+    if _is_tool_name(fn.name):
         return True
     for deco in fn.decorator_list:
         target = deco.func if isinstance(deco, ast.Call) else deco
-        parts = _chain(target)
-        if parts and _TOOL_NAME.search(parts[-1]):
+        # Any part of the decorator counts: @tool, @mcp.tool(), @function_tool,
+        # and @tool_registry.register.
+        if any(_is_tool_name(part) for part in _chain(target)):
             return True
     return False
+
+
+def _is_tool_name(name: str) -> bool:
+    """True when `tool` is a whole segment of a snake_case or camelCase name."""
+    return bool(_TOOL_NAME.search(name) or _TOOL_CAMEL.search(name))
 
 
 def _has_approval(fn: ast.FunctionDef | ast.AsyncFunctionDef) -> bool:
@@ -756,10 +791,7 @@ def _secrets(tree: ast.AST, display: str) -> list[Finding]:
     for node in ast.walk(tree):
         if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
             continue
-        defaults = list(node.args.defaults) + list(node.args.kw_defaults)
-        args = list(node.args.args)[-len(node.args.defaults) :] if node.args.defaults else []
-        args += list(node.args.kwonlyargs)
-        for arg, default in zip(args, defaults, strict=True):
+        for arg, default in _args_with_defaults(node.args):
             if default is None or not isinstance(default, ast.Constant) or not isinstance(default.value, str):
                 continue
             if default.lineno in seen:
@@ -771,6 +803,22 @@ def _secrets(tree: ast.AST, display: str) -> list[Finding]:
             findings.append(_secret_finding(display, default.lineno, f"default for {arg.arg} is a string literal"))
             seen.add(default.lineno)
     return findings
+
+
+def _args_with_defaults(spec: ast.arguments) -> list[tuple[ast.arg, ast.expr | None]]:
+    """Pair each parameter that has a default with that default.
+
+    `defaults` belongs to the last positional parameters, positional-only ones
+    included, as in `def f(key="x", /)`. `kw_defaults` lines up with
+    `kwonlyargs` and holds None where a keyword-only parameter has no default.
+    """
+    positional = list(spec.posonlyargs) + list(spec.args)
+    count = len(spec.defaults)
+    pairs: list[tuple[ast.arg, ast.expr | None]] = []
+    if count:
+        pairs += list(zip(positional[-count:], spec.defaults, strict=True))
+    pairs += list(zip(spec.kwonlyargs, spec.kw_defaults, strict=True))
+    return pairs
 
 
 def _secret_finding(display: str, line: int, message: str) -> Finding:
@@ -804,9 +852,11 @@ def _assigned_secret(value: str) -> bool:
 def _secret_prefix() -> re.Pattern[str]:
     """High-confidence credential shapes. Pieces are split so this file is not itself a secret."""
     parts = [
-        # OpenAI keys: legacy sk-..., and the current sk-proj-, sk-svcacct-, and sk-admin- shapes.
-        "sk" + r"\-" + r"(?:proj\-|svcacct\-|admin\-)?" + r"[A-Za-z0-9_\-]{16,}",
-        "sk" + r"\-" + "ant" + r"\-",
+        # OpenAI keys: legacy sk-<letters and digits>, and the current sk-proj-, sk-svcacct-,
+        # and sk-admin- shapes, whose bodies also use - and _. The lookbehind keeps
+        # "desk-lamp-checkout-flow" and "risk-assessment-report" from matching.
+        r"(?<![A-Za-z0-9_\-])" + "sk" + r"\-" + r"(?:(?:proj|svcacct|admin)\-[A-Za-z0-9_\-]{16,}|[A-Za-z0-9]{16,})",
+        r"(?<![A-Za-z0-9_\-])" + "sk" + r"\-" + "ant" + r"\-",
         "gh" + "p_",
         "gh" + "o_",
         "github_" + "pat_",

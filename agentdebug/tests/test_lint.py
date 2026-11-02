@@ -467,3 +467,83 @@ def test_review_sample_agent_findings():
     findings = lint_path(FIXTURES / "review_agent.py")
     got = sorted((item.line, item.rule_id) for item in findings)
     assert got == [(12, "AGT003"), (21, "AGT001"), (30, "AGT006"), (56, "AGT008")]
+
+
+def test_positional_only_defaults_do_not_crash_the_secret_rule(tmp_path: Path):
+    key = "sk-" + "proj-" + "abcdefghijklmnopqrstuvwx"
+    findings = _source(
+        tmp_path,
+        f'def f(api_key="{key}", /, b=2):\n'
+        "    return api_key\n"
+        "\n"
+        "def g(x, y=1, /, *, z, w=3):\n"
+        "    return x\n",
+    )
+    assert [(item.rule_id, item.line) for item in findings] == [("AGT008", 1)]
+
+
+def test_words_that_contain_sk_dash_are_not_keys(tmp_path: Path):
+    findings = _source(
+        tmp_path,
+        'SLUG = "desk-lamp-checkout-flow-v2"\n'
+        'TITLE = "risk-assessment-quarterly"\n'
+        'NAME = "task-ant-colony-simulation"\n',
+    )
+    assert "AGT008" not in _ids(findings)
+
+
+def test_a_break_in_an_inner_loop_does_not_cap_the_outer_loop(tmp_path: Path):
+    findings = _source(
+        tmp_path,
+        "def run(client, messages):\n"
+        "    while True:\n"
+        "        client.chat.completions.create(model='m', messages=messages, timeout=5)\n"
+        "        for i in range(10):\n"
+        "            if i > 5:\n"
+        "                break\n",
+    )
+    assert "AGT003" in _ids(findings)
+
+
+def test_a_return_in_an_inner_loop_still_caps_the_outer_loop(tmp_path: Path):
+    findings = _source(
+        tmp_path,
+        "def run(client, messages):\n"
+        "    turn = 0\n"
+        "    while True:\n"
+        "        turn += 1\n"
+        "        client.chat.completions.create(model='m', messages=messages, timeout=5)\n"
+        "        for _ in range(1):\n"
+        "            if turn > 10:\n"
+        "                return None\n",
+    )
+    assert "AGT003" not in _ids(findings)
+
+
+def test_broad_except_returning_false_from_a_check_is_quiet(tmp_path: Path):
+    findings = _source(
+        tmp_path,
+        "def is_number(text):\n"
+        "    try:\n"
+        "        int(text)\n"
+        "        return True\n"
+        "    except Exception:\n"
+        "        return False\n",
+    )
+    assert "AGT001" not in _ids(findings)
+
+
+def test_tool_registry_decorator_and_camel_case_tool_names_are_tools(tmp_path: Path):
+    findings = _source(
+        tmp_path,
+        "@tool_registry.register\n"
+        "def save_report(path):\n"
+        "    open(path, 'w').write('x')\n"
+        "\n"
+        "def sendEmailTool(to):\n"
+        "    smtp.send(to)\n"
+        "\n"
+        "def renderToolbar(items):\n"
+        "    sys.stdout.write(str(items))\n",
+    )
+    assert sorted(item.line for item in findings if item.rule_id == "AGT007") == [2, 5]
