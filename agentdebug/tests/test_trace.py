@@ -241,3 +241,72 @@ def test_name_of_a_tool_record_is_not_the_agent():
     assert both.steps[0].agent == ""
     agent = summarize_text(json.dumps({"name": "planner", "operation": "chat", "tool_calls": ["search"]}))
     assert agent.steps[0].agent == "planner"
+
+
+def _claude(kind, message=None, **extra):
+    record = {"type": kind, "sessionId": "s1", "uuid": f"u-{kind}-{len(extra)}", **extra}
+    if message is not None:
+        record["message"] = message
+    return json.dumps(record)
+
+
+def test_claude_code_session_with_attachment_and_last_prompt_lines():
+    lines = [
+        json.dumps({"type": "queue-operation", "operation": "enqueue", "sessionId": "s1"}),
+        _claude("user", {"role": "user", "content": "fix the test"}),
+        _claude("attachment", attachment={"type": "file"}),
+        _claude("attachment", attachment={"type": "file"}),
+        _claude("future-line-type"),
+        _claude(
+            "assistant",
+            {"id": "m1", "role": "assistant", "content": [{"type": "text", "text": "x"}], "usage": {}},
+            error="authentication_failed",
+            isApiErrorMessage=True,
+        ),
+        json.dumps({"type": "last-prompt", "lastPrompt": "fix the test", "sessionId": "s1"}),
+    ]
+    summary = summarize_text("\n".join(lines))
+    assert [step.agent for step in summary.steps] == ["claude-code", "claude-code"]
+    assert [step.operation for step in summary.steps] == ["user", "assistant"]
+    assert summary.first_error_step == 2
+    assert summary.steps[1].error == "api: authentication_failed"
+    assert summary.repeats == []
+
+
+def test_claude_code_content_block_lines_of_one_response_are_one_step():
+    usage = {"input_tokens": 900, "output_tokens": 40}
+    lines = [
+        _claude("user", {"role": "user", "content": "run tests"}),
+        _claude("assistant", {"id": "m1", "role": "assistant", "content": [{"type": "text", "text": "ok"}], "usage": usage}),
+        _claude(
+            "assistant",
+            {
+                "id": "m1",
+                "role": "assistant",
+                "content": [{"type": "tool_use", "id": "t1", "name": "Bash", "input": {"command": "pytest"}}],
+                "usage": usage,
+            },
+        ),
+        _claude(
+            "user",
+            {"role": "user", "content": [{"type": "tool_result", "tool_use_id": "t1", "is_error": True, "content": "exit 1"}]},
+        ),
+    ]
+    summary = summarize_text("\n".join(lines))
+    assert [step.operation for step in summary.steps] == ["user", "assistant", "tool_result"]
+    assert summary.steps[1].tool_calls == ["Bash"]
+    assert summary.steps[1].tool_arguments == [{"command": "pytest"}]
+    assert summary.input_tokens == 900
+    assert summary.output_tokens == 40
+    assert summary.steps[2].error == "Bash: exit 1"
+    assert summary.repeats == []
+
+
+def test_single_agent_trace_with_only_token_counts_is_recognized():
+    lines = [
+        json.dumps({"step": 1, "operation": "chat", "input_tokens": 10, "output_tokens": 5}),
+        json.dumps({"step": 2, "operation": "chat", "input_tokens": 12, "output_tokens": 7}),
+    ]
+    summary = summarize_text("\n".join(lines))
+    assert summary.input_tokens == 22
+    assert summary.output_tokens == 12

@@ -26,12 +26,19 @@ class StepView:
         return (self.agent, self.operation, tuple(self.tool_calls), args)
 
     def recognized(self) -> bool:
-        """True when the step names an agent, a tool call, or an error."""
-        return bool(self.agent or self.tool_calls or self.error)
+        """True when the step names an agent, a tool call, or an error, or carries token counts.
+
+        A single-agent trace of `{"operation": "chat", "input_tokens": 10}` lines is valid
+        and has no agent name, so token counts count as recognized fields too.
+        """
+        return bool(
+            self.agent or self.tool_calls or self.error
+            or self.input_tokens is not None or self.output_tokens is not None
+        )
 
 
 class UnrecognizedTraceError(ValueError):
-    """The file parsed as JSON, but no step had an agent, a tool, or an error."""
+    """The file parsed as JSON, but no step had an agent, a tool, an error, or token counts."""
 
 
 @dataclass
@@ -72,10 +79,9 @@ def summarize_path(path: Path) -> TraceSummary:
 
 
 def summarize_text(text: str) -> TraceSummary:
-    """Summarize a JSONL, OpenTelemetry, or Claude Code trace. Raises UnrecognizedTraceError when no step names an agent, a tool, or an error."""
+    """Summarize a JSONL, OpenTelemetry, or Claude Code trace. Raises UnrecognizedTraceError when no step names an agent, a tool, an error, or token counts."""
     records = _load_records(text)
-    session = [record for record in records if not _is_claude_meta(record)]
-    if session and all(_looks_like_claude_code(record) for record in session):
+    if _is_claude_session(records):
         steps = _claude_code_steps(records)
     else:
         records = _order_spans(records)
@@ -83,7 +89,8 @@ def summarize_text(text: str) -> TraceSummary:
         steps = [_to_step(record, position, agents) for position, record in enumerate(records, start=1)]
     if steps and not any(step.recognized() for step in steps):
         raise UnrecognizedTraceError(
-            f"no recognized fields in {len(steps)} records: no step has an agent, a tool call, or an error. "
+            f"no recognized fields in {len(steps)} records: no step has an agent, a tool call, an error, "
+            "or token counts. "
             "See Trace schema in the agentdebug README for the accepted shapes."
         )
     return _summarize(steps)
@@ -499,12 +506,31 @@ def _otlp_value(raw: Any) -> Any:
 
 
 _CLAUDE_TYPES = {"user", "assistant", "system"}
-_CLAUDE_META_TYPES = {"summary", "file-history-snapshot", "queue-operation"}
+_CLAUDE_TURN_TYPES = {"user", "assistant"}
+_CLAUDE_META_TYPES = {"summary", "file-history-snapshot", "queue-operation", "attachment", "last-prompt"}
+_CLAUDE_SESSION_KEYS = ("sessionId", "uuid", "leafUuid")
 
 
 def _is_claude_meta(record: dict[str, Any]) -> bool:
     """True for Claude Code records that carry no turn, such as a summary line."""
     return record.get("type") in _CLAUDE_META_TYPES
+
+
+def _is_claude_session(records: list[dict[str, Any]]) -> bool:
+    """True when the file is a Claude Code session.
+
+    At least one line is a user or assistant turn, and every line carries a
+    Claude Code session key or a known non-turn type. Claude Code adds new
+    non-turn line types over time (attachment and last-prompt are recent),
+    so an unknown type with a session id does not send the file down the
+    generic path.
+    """
+    if not any(_looks_like_claude_code(record) for record in records):
+        return False
+    return all(
+        _is_claude_meta(record) or any(key in record for key in _CLAUDE_SESSION_KEYS)
+        for record in records
+    )
 
 
 def _looks_like_claude_code(record: dict[str, Any]) -> bool:
@@ -525,10 +551,13 @@ def _claude_code_steps(records: list[dict[str, Any]]) -> list[StepView]:
     """
     tool_names: dict[str, str] = {}
     steps: list[StepView] = []
+    last_message_id: str | None = None
     for record in records:
-        if _is_claude_meta(record) or record.get("type") == "system":
+        if record.get("type") not in _CLAUDE_TURN_TYPES:
+            last_message_id = None
             continue
-        message = record.get("message") or {}
+        raw_message = record.get("message")
+        message: dict[str, Any] = raw_message if isinstance(raw_message, dict) else {}
         role = str(message.get("role") or record.get("type") or "")
         agent = "claude-code:sidechain" if record.get("isSidechain") else "claude-code"
         content = message.get("content")
@@ -552,8 +581,20 @@ def _claude_code_steps(records: list[dict[str, Any]]) -> list[StepView]:
                 if block.get("is_error") and error is None:
                     name = tool_names.get(str(block.get("tool_use_id")), "tool")
                     error = f"{name}: {_result_text(block.get('content')) or 'error'}"
-        usage = message.get("usage") if isinstance(message.get("usage"), dict) else {}
+        if error is None and role == "assistant" and (record.get("isApiErrorMessage") or record.get("error")):
+            # A failed model call: Claude Code writes {"error": "authentication_failed", "isApiErrorMessage": true}.
+            error = f"api: {_clean_error(record.get('error')) or 'error'}"
+        raw_usage = message.get("usage")
+        usage: dict[str, Any] = raw_usage if isinstance(raw_usage, dict) else {}
         operation = "tool_result" if results and role == "user" else role
+        message_id = message.get("id") if role == "assistant" and isinstance(message.get("id"), str) else None
+        if message_id and message_id == last_message_id and steps:
+            # Claude Code writes one line per content block of a single response, each
+            # with the same message id and the same usage. Fold them into one step so
+            # tokens are counted once and text, then tool_use, is not a "repeat".
+            _merge_claude_step(steps[-1], tools, arguments, error, usage)
+            continue
+        last_message_id = message_id
         steps.append(
             StepView(
                 index=len(steps) + 1,
@@ -567,6 +608,25 @@ def _claude_code_steps(records: list[dict[str, Any]]) -> list[StepView]:
             )
         )
     return steps
+
+
+def _merge_claude_step(
+    step: StepView,
+    tools: list[str],
+    arguments: list[Any],
+    error: str | None,
+    usage: dict[str, Any],
+) -> None:
+    """Add one more content-block line of the same assistant response to its step."""
+    merged_args = (step.tool_arguments or [None] * len(step.tool_calls)) + arguments
+    step.tool_calls = step.tool_calls + tools
+    step.tool_arguments = merged_args if any(value is not None for value in merged_args) else []
+    step.error = step.error or error
+    # The usage on each line is the response's usage, not a delta. Keep the last one.
+    if _as_int(usage.get("input_tokens")) is not None:
+        step.input_tokens = _as_int(usage.get("input_tokens"))
+    if _as_int(usage.get("output_tokens")) is not None:
+        step.output_tokens = _as_int(usage.get("output_tokens"))
 
 
 def _result_text(content: Any) -> str:
