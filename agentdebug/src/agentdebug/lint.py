@@ -484,9 +484,16 @@ def _loop_body_nodes(body: list[ast.stmt], nested: bool):
             stack.append((child, child_inner))
 
 
+def _is_elif(node: ast.If) -> bool:
+    """True when the else branch is just an `elif`."""
+    return len(node.orelse) == 1 and isinstance(node.orelse[0], ast.If)
+
+
 def _if_exits(node: ast.If, nested: bool = False) -> bool:
-    """True when the if body leaves the loop: return or raise, or a break that is not inside an inner loop."""
-    for item, inner in _loop_body_nodes(node.body, nested):
+    """True when the if or else body leaves the loop: return or raise, or a break that is not inside an inner loop."""
+    # An `else: break` leaves the loop too. An `elif` is its own If node and is checked on its own.
+    branches = node.body if _is_elif(node) else node.body + node.orelse
+    for item, inner in _loop_body_nodes(branches, nested):
         if isinstance(item, (ast.Return, ast.Raise)):
             return True
         if isinstance(item, ast.Break) and not inner:
@@ -496,6 +503,8 @@ def _if_exits(node: ast.If, nested: bool = False) -> bool:
 
 def _cap_name(name: str) -> bool:
     """True for a name that reads as an iteration cap, not a token limit such as max_tokens."""
+    # Split camelCase so maxTurns reads as max_Turns and maxOutputTokens as a token limit.
+    name = re.sub(r"(?<=[a-z0-9])(?=[A-Z])", "_", name)
     return bool(_MAX_NAME.search(name)) and not _TOKEN_LIMIT_NAME.search(name)
 
 
@@ -507,6 +516,13 @@ def _compare_names(test: ast.AST) -> list[str]:
             names.append(item.id)
         elif isinstance(item, ast.Attribute):
             names.append(item.attr)
+        elif (
+            isinstance(item, ast.Subscript)
+            and isinstance(item.slice, ast.Constant)
+            and isinstance(item.slice.value, str)
+        ):
+            # config["max_turns"] names its cap with a string key.
+            names.append(item.slice.value)
     return names
 
 
@@ -515,7 +531,8 @@ def _test_is_counter_cap(test: ast.AST) -> bool:
     if isinstance(test, ast.BoolOp):
         return any(_test_is_counter_cap(value) for value in test.values)
     if not isinstance(test, ast.Compare):
-        return False
+        # `if budget.exhausted():` or `if not limits.ok(turn):` checks a cap without a comparison.
+        return any(_cap_name(name) for name in _compare_names(test))
     names = _compare_names(test)
     has_counter = any(_COUNTER_NAME.match(name) for name in names)
     has_cap = any(_cap_name(name) for name in names)

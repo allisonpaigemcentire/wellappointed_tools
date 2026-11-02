@@ -570,3 +570,76 @@ def test_lower_camel_case_tool_name_is_a_tool(tmp_path: Path):
         "    smtp.send(items)\n",
     )
     assert [item.line for item in findings if item.rule_id == "AGT007"] == [1]
+
+
+# Regression cases from the 2026-11-02 Debugging Bot review.
+
+
+def test_budget_method_that_exits_caps_the_loop(tmp_path: Path):
+    findings = _source(
+        tmp_path,
+        "def run(client, budget):\n"
+        "    while True:\n"
+        "        client.chat.completions.create(model='m', messages=[], timeout=5)\n"
+        "        if budget.exhausted():\n"
+        "            break\n",
+    )
+    assert "AGT003" not in _ids(findings)
+
+
+def test_break_in_else_caps_the_loop(tmp_path: Path):
+    findings = _source(
+        tmp_path,
+        "def run(client, max_turns=3):\n"
+        "    turn = 0\n"
+        "    while True:\n"
+        "        client.chat.completions.create(model='m', messages=[], timeout=5)\n"
+        "        if turn < max_turns:\n"
+        "            turn += 1\n"
+        "            continue\n"
+        "        else:\n"
+        "            break\n",
+    )
+    assert "AGT003" not in _ids(findings)
+
+
+def test_elif_exit_does_not_cap_through_the_first_test(tmp_path: Path):
+    findings = _source(
+        tmp_path,
+        "def run(client, max_turns=3, done=False):\n"
+        "    turn = 0\n"
+        "    while True:\n"
+        "        client.chat.completions.create(model='m', messages=[], timeout=5)\n"
+        "        if turn < max_turns:\n"
+        "            turn += 1\n"
+        "        elif done:\n"
+        "            break\n",
+    )
+    assert "AGT003" in _ids(findings)
+
+
+def test_config_key_and_camel_case_caps_count(tmp_path: Path):
+    for test in ('turn >= config["max_turns"]', "turn >= maxTurns"):
+        findings = _source(
+            tmp_path,
+            "def run(client, config, maxTurns=3):\n"
+            "    turn = 0\n"
+            "    while True:\n"
+            "        turn += 1\n"
+            "        client.chat.completions.create(model='m', messages=[], timeout=5)\n"
+            f"        if {test}:\n"
+            "            break\n",
+        )
+        assert "AGT003" not in _ids(findings), test
+
+
+def test_camel_case_token_limit_is_not_an_iteration_cap(tmp_path: Path):
+    findings = _source(
+        tmp_path,
+        "def run(client, maxOutputTokens=64):\n"
+        "    while True:\n"
+        "        client.chat.completions.create(model='m', messages=[], timeout=5)\n"
+        "        if maxOutputTokens:\n"
+        "            break\n",
+    )
+    assert "AGT003" in _ids(findings)
